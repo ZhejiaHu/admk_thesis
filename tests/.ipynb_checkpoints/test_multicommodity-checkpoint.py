@@ -22,9 +22,9 @@ def create_forcing(n_nodes, num_commodity: int=2) -> List[np.ndarray]:
     else: return [forcing_1, forcing_2]
 
 
-def set_control(beta:float=1, log_print=True):
+def set_control(beta:float=1):
     ctrl = AdmkControls(tol_optimization=1e-3, tol_constraint=1e-8, method='explicit_tdens', max_iter=200,
-                        max_restart=5, verbose=0, log=0, log_file='admk.log', beta=beta, log_print=log_print)
+                        max_restart=5, verbose=1, log=0, log_file='admk.log', beta=beta)
 
     # deltat controls
     ctrl.set_method_ctrl('deltat',
@@ -70,7 +70,7 @@ def test_main(topol: np.ndarray, weight: np.ndarray, num_commodity: int, forcing
 
 
     problem = MinNorm(incidence_matrix_transpose, rhs_of_time=forcing, q_exponent=1.0, weight=weight)
-    admk = AdmkSolver(problem, set_control(beta=beta, log_print=False))
+    admk = AdmkSolver(problem, set_control(beta=beta))
     admk.ctrl.set_method_ctrl(['pc','type'],'hypre')
     sol0 = deepcopy(admk.solution) # first option
     sol0 = AdmkSolution(problem) # second option
