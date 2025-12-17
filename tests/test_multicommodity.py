@@ -87,20 +87,26 @@ def test_main(topol: np.ndarray, weight: np.ndarray, num_commodity: int, forcing
     tdens0[:]=2.0
     admk.set_initial_guess(sol0)
 
-    ierr = admk.solve()
+    ierr, history_losses = admk.solve()
+    def _plot(history_losses: List[float]):
+        plt.plot(history_losses)
+        plt.xlabel("Iteration")
+        plt.ylabel("Losses (Energy)")
+        plt.title("Losses During Training")
+
+    print(history_losses)
+    _plot(history_losses)
     print('ierr=',ierr,admk.ierr_dictionary(ierr))
     pot, tdens, vel = admk.solution.get_problem_solution()
 
-    pot0 = admk.solution.get_subpotential(0)
-    pot1 = admk.solution.get_subpotential(1)
-    print('pot0=',pot0)
-    print('pot1=',pot1)
+    pots = [admk.solution.get_subpotential(i) for i in range(num_commodity)]
+    print(f"pots = {pots}")
     print('tdens=',tdens)
     print('vel=',vel)
 
     # check if convergence is achieved
-    if num_commodity == 1: return [pot0], tdens
-    else: return [pot0, pot1], tdens
+    return pots, tdens
+
 
 if __name__ == "__main__":
     topo = np.array([[0, 1], [0, 2], [0, 3], [2, 3], [1, 2], [3, 4], [0, 4]],)
