@@ -13,12 +13,13 @@ import numpy as np
 from typing import List, Tuple
 
 
-def create_forcing(n_nodes) -> List[np.ndarray]:
-    forcing_1 = np.ones(n_nodes)
+def create_forcing(n_nodes, num_commodity: int=2) -> List[np.ndarray]:
+    forcing_1 = np.ones(n_nodes)  / (n_nodes - 1)
     forcing_1[0] = -sum(forcing_1[1:])
     forcing_2 = np.ones(n_nodes)
     forcing_2[-1] = -sum(forcing_2[:-1])
-    return [forcing_1, forcing_2]
+    if num_commodity == 1: return [forcing_1]
+    else: return [forcing_1, forcing_2]
 
 
 def set_control():
@@ -39,22 +40,27 @@ def set_control():
     return ctrl
 
 
-def plot_result(graph_topo: np.ndarray, num_commodity: int, potentials: List[np.ndarray], conductivity: np.ndarray):
-    assert len(potentials) == num_commodity and len(conductivity) == graph_topo.shape[0]
+def plot_result(graph_topo: np.ndarray, weights: np.ndarray, num_commodity: int, potentials: List[np.ndarray], conductivity: np.ndarray):
+    assert len(potentials) == num_commodity and len(conductivity) == graph_topo.shape[0] and graph_topo.shape[0] == weights.shape[0]
     graph = nx.Graph()
-    graph.add_edges_from(graph_topo)
+    graph.add_edges_from(map(lambda i: (graph_topo[i][0], graph_topo[i][1], {"weight": weights[i], "conductivity": conductivity[i]}), range(len(graph_topo))))
     print(graph.edges)
     print(graph.nodes)
     fig, ax = plt.subplots(num_commodity, 1, figsize=(8, 8))
     pos = nx.spring_layout(graph)
+    edge_labels, conductivity = nx.get_edge_attributes(graph, "weight"), nx.get_edge_attributes(graph, "conductivity")
+    print(conductivity)
+    print(f"Conductivity is {conductivity}")
     for i, potential in enumerate(potentials):
-        nx.draw_networkx_edges(graph, pos, width=conductivity * 2, edge_color="C0", style="solid", ax=ax[i])
-        nx.draw_networkx_nodes(graph, pos=pos, node_shape='o', node_color='gray', node_size=potential * 1000, linewidths=0.1, ax=ax[i])
+        nx.draw_networkx_edges(graph, pos, width=[conductivity.get(edge, 1.0) * 3 for edge in list(graph.edges())], edge_color="C0", style="solid", ax=ax[i] if num_commodity > 1 else ax)
+        nx.draw_networkx_nodes(graph, pos=pos, node_shape='o', node_color='gray', node_size=np.abs(potential) * 500, linewidths=0.1, ax=ax[i] if num_commodity > 1 else ax)
+        nx.draw_networkx_labels(graph, pos=pos, labels={n: n for n in pos}, ax=ax[i] if num_commodity > 1 else ax)
+        nx.draw_networkx_edge_labels(graph, pos, edge_labels=edge_labels, ax=ax[i] if num_commodity > 1 else ax)
 
 
-def test_main(topol: np.ndarray, num_commodity: int, forcing_: List[np.ndarray]) -> Tuple[List[np.ndarray], np.ndarray]:
+
+def test_main(topol: np.ndarray, weight: np.ndarray, num_commodity: int, forcing_: List[np.ndarray]) -> Tuple[List[np.ndarray], np.ndarray]:
     assert len(forcing_) == num_commodity
-    weight = np.ones(len(topol))
 
     # Init. graph problem, incidence matrix and its transpose
     graph = Graph(topol.transpose())
@@ -93,11 +99,13 @@ def test_main(topol: np.ndarray, num_commodity: int, forcing_: List[np.ndarray])
     print('vel=',vel)
 
     # check if convergence is achieved
-    return [pot0, pot1], tdens
+    if num_commodity == 1: return [pot0], tdens
+    else: return [pot0, pot1], tdens
 
 if __name__ == "__main__":
-    topo = np.array([[0, 1], [0, 2], [0, 3], [2, 3], [1, 2], [3, 4]])
-    potentials, conductivity = test_main(topo, 2, create_forcing(5))
-    plot_result(topo, 2, potentials, conductivity)
+    topo = np.array([[0, 1], [0, 2], [0, 3], [2, 3], [1, 2], [3, 4], [0, 4]],)
+    weights = np.array([1, 11, 10, 4, 5, 6, 1])
+    potentials, conductivity = test_main(topo, weights, 2, create_forcing(5, num_commodity=2))
+    plot_result(topo, weights,  2, potentials, conductivity)
     plt.show()
 
