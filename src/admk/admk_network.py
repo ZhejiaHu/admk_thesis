@@ -1,15 +1,15 @@
-# import Solver 
-from copy import deepcopy 
+# import Solver
+from copy import deepcopy
 
 import sys
 
 import numpy as np
 import scipy as sp
 import scipy.sparse.linalg as splinalg
-from scipy.linalg import norm 
+from scipy.linalg import norm
 import time as cputiming
 import os
-from .linear_solvers import implicit_block_diag   
+from .linear_solvers import implicit_block_diag
 from scipy.sparse import bmat
 
 from .linear_solvers import info_ksp
@@ -25,7 +25,7 @@ from multiprocessing import RawArray, Array
 def myNewton(self, F, J, X, max_iter, tol):
     it = 0
     inc = np.zeros(X.shape)
-    ierr = 0 
+    ierr = 0
     while (it<=max_iter):
         f=F(X)
         fnorm = norm(f)
@@ -33,37 +33,37 @@ def myNewton(self, F, J, X, max_iter, tol):
             break
         jacobian = J(X)
 
-        
+
         solve(J , inc,-f)
 
         X += inc
         it += 1
     return ierr, iter
-        
-       
-       
-        
-    
-    
-        
+
+
+
+
+
+
+
 class MinNormProblem:
     """
-    This class contains the inputs of problem GraphDmk 
-    min |v|^{q>=1}_w : A v = rhs 
-    with 
+    This class contains the inputs of problem GraphDmk
+    min |v|^{q>=1}_w : A v = rhs
+    with
     - |v|^{q>=1}_w = \sum_{i} |v_i|^q* w_i
       where w is a strictly positive vector
     - A signed incidence matrix of graph G
       rows number = number of nodes
-      columns number = number of edges    
+      columns number = number of edges
     - rhs_of_time = right-hand side. it can be a function of time
     - q_exponent = exponent of the norm
     - weight = weight in the norm
     - initial_time = initial rhs in case of time varying
     """
-    def __init__(self, 
+    def __init__(self,
                  matrix,
-                 rhs, 
+                 rhs,
                  q_exponent=1.0,
                  weight=None,
                  dirichlet_nodes=[],
@@ -74,10 +74,10 @@ class MinNormProblem:
         self.matrix = matrix
         self.n_row = matrix.shape[0]
         self.n_col = matrix.shape[1]
-        
+
         self.matrixT = self.matrix.transpose()
 
-        
+
         self.dirichlet_nodes = dirichlet_nodes
         self.dirichlet_values = dirichlet_values
 
@@ -86,16 +86,16 @@ class MinNormProblem:
             weight = np.ones(self.n_col)
         self.weight = weight
         self.inv_weight = 1.0 / weight
-        
+
         self.inv_W = sp.sparse.diags(self.inv_weight)
         self.grad = self.inv_W.dot(self.matrixT)
         self.div = self.matrix
-        
-        
-        
-            
+
+
+
+
         # We set the rhs at the initial time
-        # to get the number of rhs and fix the rhs 
+        # to get the number of rhs and fix the rhs
         # if fix in time
         self.rhs = deepcopy(rhs)
         self.q_exponent = q_exponent
@@ -103,8 +103,8 @@ class MinNormProblem:
         ierr = self.check_inputs()
         if (ierr != 0):
             raise ValueError('Error in inputs')
-    
-    
+
+
     def check_inputs(self, tolerance_inbalance=1e-11):
         """
         Method to check problem inputs consistency
@@ -116,7 +116,7 @@ class MinNormProblem:
             ierr=1
         return ierr
 
-    
+
     def constraint_residual(self, vel):
         """
         Procedure to compute residual of the constraint
@@ -134,7 +134,7 @@ class MinNormProblem:
 
 #
 # following code is taken from firedrake
-#           
+#
 def flatten_parameters(parameters, sep="_"):
     """Flatten a nested parameters dict, joining keys with sep.
 
@@ -222,7 +222,7 @@ def nested_get(dic, keys):
     for key in keys[:-1]:
         if key in d:
             d = d[key]
-            
+
     value = d[keys[-1]]
     return value
 
@@ -243,7 +243,7 @@ def nested_set(dic, keys, value, create_missing=True):
 
     def current(self):
         """
-        Create a copy of the current controls 
+        Create a copy of the current controls
         with only the method currently used
         """
         simplified = deepcopy(self.all)
@@ -255,29 +255,29 @@ def nested_set(dic, keys, value, create_missing=True):
         return simplified
 
 
-                
-        
+
+
 def adaptive_deltat(state, update):
     order_down = -1
     order_up = 1
     min_u = np.min(update)
     max_u = np.max(update)
 
-    deltat_l = 1e30 
+    deltat_l = 1e30
     if min_u < 0:
         deltat_l = (10**order_down - 1 ) / min_u
 
     deltat_u = 1e30
     if max_u > 0:
         deltat_u = (10**order_up - 1 ) / max_u
-    
+
     deltat = min(deltat_l,deltat_u)
 
     return deltat
-    
-            
 
-            
+
+
+
 
 def solve_with_petsc(stiff,
                      rhs: np.array,
@@ -291,7 +291,7 @@ def solve_with_petsc(stiff,
     petsc_stiff = PETSc.Mat().createAIJ(size=stiff.shape,
                                         csr=(stiff.indptr, stiff.indices,
                                             stiff.data))
-    
+
     petsc_pot = petsc_stiff.createVecLeft()
     petsc_rhs = petsc_stiff.createVecRight()
 
@@ -303,26 +303,26 @@ def solve_with_petsc(stiff,
 
     # copy from https://github.com/FEniCS/dolfinx/blob/230e027269c0b872c6649f053e734ed7f49b6962/python/dolfinx/fem/petsc.py#L618
     # https://github.com/FEniCS/dolfinx/fem/petsc.py
-    opts = PETSc.Options()    
+    opts = PETSc.Options()
     opts.prefixPush(problem_prefix)
     for k, v in petsc_options.items():
         opts[k] = v
     opts.prefixPop()
     ksp.setConvergenceHistory()
     #ksp.pc.setReusePreconditioner(True) # not sure if this is needed
-    ksp.setFromOptions()            
+    ksp.setFromOptions()
     petsc_stiff.setOptionsPrefix(problem_prefix)
     petsc_stiff.setFromOptions()
     petsc_pot.setOptionsPrefix(problem_prefix)
-    
+
     petsc_rhs.setFromOptions()
 
-        
-    ierr = 0   
+
+    ierr = 0
     iter = 0
     res = 0
     pres = 0
-    
+
     # convert to petsc
     petsc_rhs.setArray(rhs)
     petsc_pot.setArray(pot)
@@ -343,9 +343,9 @@ def solve_with_petsc(stiff,
         if len(h)>0:
             resvec = h[-(last_iter+1):]
             rhs_norm = petsc_rhs.norm()
-            if rhs_norm > 0: 
+            if rhs_norm > 0:
                 res=max(res,resvec[-1]/rhs_norm)
-        
+
         last_pres = ksp.getResidualNorm()
         pres = max(pres,last_pres)
 
@@ -354,23 +354,23 @@ def solve_with_petsc(stiff,
 
     # get solution
     pot[:] = petsc_pot.getArray()
-    
-    return ierr, iter, res, pres        
+
+    return ierr, iter, res, pres
 
 
 class AdmkSolverNetwork:
     """
     Solver class for problem
     min \|v\|_{w}^{q} A v = rhs
-    with A signed incidence matrix of Graph   
+    with A signed incidence matrix of Graph
     via Algebraic Dynamic Monge-Kantorovich.
     We find the long time solution of the
-    dynamics 
-    \dt \Tdens(t)=\Tdens(t) * | \Grad \Pot(\Tdens)|^2 -Tdens^{gamma}    
+    dynamics.py
+    \dt \Tdens(t)=\Tdens(t) * | \Grad \Pot(\Tdens)|^2 -Tdens^{gamma}
     """
-    def __init__(self, 
-                 problem: MinNormProblem, 
-                 tol_opt:float = 1e-3, 
+    def __init__(self,
+                 problem: MinNormProblem,
+                 tol_opt:float = 1e-3,
                  tol_constraint:float = 1e-5):
         """
 	Initialize solver with passed controls (or default)
@@ -380,7 +380,7 @@ class AdmkSolverNetwork:
         self.n_pot = problem.n_row
         self.n_tdens = problem.n_col
         self.sol = self.init_solution()
-        
+
 	# init infos
         self.linear_solver_iterations = 0
         self.nonlinear_solver_iterations = 0
@@ -406,11 +406,11 @@ class AdmkSolverNetwork:
         self.tdens_is = PETSc.IS()
         #self.pot_is.createGeneral(np.arange(self.n_pot,dtype='i'),comm=PETSc.COMM_WORLD)
         #self.tdens_is.createGeneral(np.arange(self.n_tdens,dtype='i')+self.n_pot,comm=PETSc.COMM_WORLD)
-        self.pot_is.createStride(size=self.n_pot, first=0, step=1, comm=PETSc.COMM_WORLD) 
+        self.pot_is.createStride(size=self.n_pot, first=0, step=1, comm=PETSc.COMM_WORLD)
         self.tdens_is.createStride(size=self.n_tdens, first=self.n_pot , step=1, comm=PETSc.COMM_WORLD)
 
 
-        
+
 
     def get_otp_solution(self):
         """
@@ -419,7 +419,7 @@ class AdmkSolverNetwork:
         pot, tdens = self.subfunctions(self.sol)
         vel = tdens * self.problem.grad.dot(pot)
         return vel, pot, tdens
-        
+
     ####################################################
     # CONTROLS
     ####################################################
@@ -449,14 +449,14 @@ class AdmkSolverNetwork:
                             'expansion': 1.05,
                             'contraction': 2.0,
                 },
-                # linear solver controls 
+                # linear solver controls
                 'ksp': {
                     'type':'cg',
                     'norm_type': 'unpreconditioned',
                 },
                 'pc':{
                     'type': 'hypre',
-                    # used if for ilu only 
+                    # used if for ilu only
                     'factor_drop_tolerance':{
                         'dt': 1e-4,
                         'maxrowcount': 30
@@ -488,14 +488,14 @@ class AdmkSolverNetwork:
                             'expansion': 2,
                             'contraction': 2.0,
                 },
-                # linear solver controls 
+                # linear solver controls
                 'ksp': {
                     'type':'cg',
                     'norm_type': 'unpreconditioned',
                 },
                 'pc':{
                     'type': 'hypre',
-                    # used if for ilu only 
+                    # used if for ilu only
                     'factor_drop_tolerance':{
                         'dt': 1e-4,
                         'maxrowcount': 30
@@ -506,7 +506,7 @@ class AdmkSolverNetwork:
                     'max_it': 20
                 }
             },
-            # 
+            #
             'relax_Laplacian': 1e-10,
             # linear solver controls for first iteration
             'ksp': {
@@ -516,14 +516,14 @@ class AdmkSolverNetwork:
             },
             'pc':{
                 'type': 'hypre',
-                # used if for ilu only 
+                # used if for ilu only
                 'factor_drop_tolerance':{
                     'dt': 1e-4,
                     'maxrowcount': 30
                 }
             }
         }
-        
+
         return ctrl
 
     def set_ctrl(self, keys_list, value):
@@ -536,10 +536,10 @@ class AdmkSolverNetwork:
             keys_list=[keys_list]
         return nested_get(self.ctrl,keys_list)
 
-    
+
     def print_info(self, msg, priority, indent=0):
         """
-	Print messagge to stdout and to log 
+	Print messagge to stdout and to log
         file according to priority passed
         """
         if (self.get_ctrl("verbose") >= priority):
@@ -550,7 +550,7 @@ class AdmkSolverNetwork:
     ####################################################
     # CONTROLS
     ####################################################
-                
+
     # functions defining how the solver specific variables
     # stored for this algorithm
     def init_solution(self):
@@ -569,13 +569,13 @@ class AdmkSolverNetwork:
         tdens = sol[-self.n_tdens:]
         return pot, tdens
 
-    
+
     def solve_pot(self, sol, petsc_options):
-        """        
+        """
         Args:
-         sol: np.array [pot,tdens], changed in place 
+         sol: np.array [pot,tdens], changed in place
          petsc_options: dictionary for petsc solver
-		
+
         Returns:
          ierr : control flag (=0 if everthing worked)
         """
@@ -589,9 +589,9 @@ class AdmkSolverNetwork:
         start_time = cputiming.time()
         diag_tdens = sp.sparse.diags(tdens)
         stiff = self.problem.div.dot(diag_tdens.dot(self.problem.grad))
-        msg = ('ASSEMBLY'+'{:.2f}'.format(-(start_time - cputiming.time()))) 
+        msg = ('ASSEMBLY'+'{:.2f}'.format(-(start_time - cputiming.time())))
         self.print_info(msg, 3, 2)
-    
+
         rhs = self.problem.rhs.copy()
 
         #
@@ -601,7 +601,7 @@ class AdmkSolverNetwork:
         stiff += relax * sp.sparse.eye(self.n_pot) # matrix is singular
 
         ierr, iters, res, pres = solve_with_petsc(stiff, rhs, pot, petsc_options )
-        
+
         # info
         msg =(f'{ierr=} it={iters:04d}'
               +f' res={res:.1e}'
@@ -609,7 +609,7 @@ class AdmkSolverNetwork:
         self.print_info(msg, priority = 2, indent = 1)
 
         return ierr
-    
+
     def pmass(self):
         return self.problem.q_exponent / ( 2 - self.problem.q_exponent)
 
@@ -631,31 +631,31 @@ class AdmkSolverNetwork:
     def lambdafy(g):
         t = g.get
         return sympy.lambdafy(t, g)
-    
+
     def weight_mass(self, tdens):
         return 0.5 * np.dot(problem.weight * self.mass_function(tdens))
-    
+
     def Lagrangian(self, pot, tdens):
         """
         Compute Lagrangian of the problem
         """
         grad_pot = self.problem.grad.dot(pot)
         forcing = self.problem.rhs
-        L = ( np.dot(forcing,pot) 
+        L = ( np.dot(forcing,pot)
              - 0.5 * np.dot(tdens * grad_pot**2, self.problem.weight)
              + 0.5 * np.dot(tdens ** self.pmass(), self.problem.weight)
-        )   
+        )
         return L
 
     def Lagrangian_gradient(self, pot, tdens, var):
         """
-        Compute the gradient w.r.t to variable 
+        Compute the gradient w.r.t to variable
         """
         if var == 'tdens':
             grad_pot = self.problem.grad.dot(pot)
             pmass = self.problem.q_exponent / (2 - self.problem.q_exponent)
             gradient_tdens = 0.5 * (- grad_pot**2 + tdens**(pmass-1))
-            
+
             return gradient_tdens
 
         elif var == 'pot':
@@ -663,12 +663,12 @@ class AdmkSolverNetwork:
             gradient_pot = self.problem.rhs - self.problem.div.dot(tdens * grad_pot)
             #for inode in self.problem.dirichlet_nodes:
             #    gradient_pot[inode] = pot[inode] - self.problem.dirichlet_values[inode]
-            
+
             return gradient_pot
 
     def Lagrangian_hessian(self, pot, tdens, var_row, var_col):
         """
-        Compute the gradient w.r.t to variable 
+        Compute the gradient w.r.t to variable
         """
         if var_row == 'tdens' :
             if var_col == 'tdens':
@@ -682,7 +682,7 @@ class AdmkSolverNetwork:
                 grad_pot = self.problem.grad.dot(pot)
                 D = sp.sparse.diags(-1.0*grad_pot)
                 #matvec = lambda x: grad_pot * self.problem.grad.dot(x)
-                #hessian = splinalg.LinearOperator((self.n_pot,self.n_tdens),matvec) 
+                #hessian = splinalg.LinearOperator((self.n_pot,self.n_tdens),matvec)
                 #sp.sparse.diags(trans_prime * grad_pot).dot(problem.matrixT)
                 hessian = D.dot(self.problem.matrixT)
                 return hessian
@@ -694,9 +694,9 @@ class AdmkSolverNetwork:
                 diag_tdens = sp.sparse.diags(-1.0*tdens)
                 hessian = self.problem.div.dot(diag_tdens.dot(self.problem.grad))
                 return hessian
-        
-        
-        
+
+
+
 
     def opt_residual(self, sol):
         """
@@ -709,8 +709,8 @@ class AdmkSolverNetwork:
             norm (tdens * self.problem.weight)
         )
         return var
-            
-        
+
+
 
     def tdens2gfvar(self,tdens):
         """
@@ -736,15 +736,15 @@ class AdmkSolverNetwork:
     def build_fnewton_gfvar(self, problem, pot, gfvar, gfvar_old, ctrl):
         # assembly nonlinear equation
         # F_pot=f_newton[1:n_pot]= stiff * pot - rhs
-        # F_pot=f_newton[1+n_pot:n_pot + n_tdens] = -weight (gfvar-gfvar_old)/deltat + \grad \Lyapunov        
+        # F_pot=f_newton[1+n_pot:n_pot + n_tdens] = -weight (gfvar-gfvar_old)/deltat + \grad \Lyapunov
         tdens = self.gfvar2tdens(gfvar, 0) # 1 means first derivative
         trans_prime = self.gfvar2tdens(gfvar, 1) # 1 means first derivative
         trans_second = self.gfvar2tdens(gfvar, 2) # 2 means second derivative
         grad_pot = problem.potential_gradient(pot)
 
-        
+
         f_newton = np.zeros(npot+ntdens)
-        
+
         f_newton[0:n_pot] = (problem.matrix.dot(tdens*grad_pot) - problem.rhs)
         f_newton[n_pot:n_pot+n_tdens] = -problem.weight * (
             ( gfvar - gfvar_old ) / ctrl.deltat
@@ -773,11 +773,11 @@ class AdmkSolverNetwork:
     def eval_F(self, potgfvar, fnewton):
         pot, gfvar = self.subfunctions(potgfvar)
         tdens = self.gfvar2tdens(gfvar)
-        trans_prime = self.gfvar2tdens(gfvar, 1) 
-                
-            
+        trans_prime = self.gfvar2tdens(gfvar, 1)
+
+
         fnewton[self.pot_indices] = self.Lagrangian_gradient(pot, tdens, 'pot')
-        fnewton[self.tdens_indices] = self.Lagrangian_gradient(pot, tdens, 'tdens') * trans_prime 
+        fnewton[self.tdens_indices] = self.Lagrangian_gradient(pot, tdens, 'tdens') * trans_prime
         fnewton[self.tdens_indices] += 1 / self.deltat * self.problem.weight * (gfvar - self.gfvar_old)
 
     def eval_Jacobian(self, potgfvar):
@@ -785,7 +785,7 @@ class AdmkSolverNetwork:
         tdens = self.gfvar2tdens(gfvar)
         trans_prime = self.gfvar2tdens(gfvar, 1)
         trans_second = self.gfvar2tdens(gfvar, 2)
-            
+
         J11 = self.Lagrangian_hessian(pot, tdens, 'pot', 'pot')-1e-10*sp.sparse.eye(self.n_pot)
         D_prime = sp.sparse.diags(trans_prime)
         J12 = self.Lagrangian_hessian(pot, tdens, 'pot', 'tdens').dot(D_prime)
@@ -800,14 +800,14 @@ class AdmkSolverNetwork:
 
     def F_block(self, snes,  potgfvar_petsc, F_petsc):
         potgfvar = potgfvar_petsc.array
-        
+
         pot, gfvar = self.subfunctions(potgfvar)
         tdens = self.gfvar2tdens(gfvar)
-        trans_prime = self.gfvar2tdens(gfvar, 1) 
+        trans_prime = self.gfvar2tdens(gfvar, 1)
 
         fnewton = np.zeros(self.n_pot + self.n_tdens)
         fnewton[self.pot_indices] = self.Lagrangian_gradient(pot, tdens, 'pot')
-        fnewton[self.tdens_indices] = self.Lagrangian_gradient(pot, tdens, 'tdens') * trans_prime 
+        fnewton[self.tdens_indices] = self.Lagrangian_gradient(pot, tdens, 'tdens') * trans_prime
         fnewton[self.tdens_indices] += 1 / self.deltat * self.problem.weight * (gfvar - self.gfvar_old)
 
         F_petsc.setArray(fnewton)
@@ -819,37 +819,37 @@ class AdmkSolverNetwork:
         petsc_J12 = scipy2petsc(J12)
         petsc_J21 = scipy2petsc(J21)
         petsc_J22 = scipy2petsc(J22)
-        
+
         J_petsc = PETSc.Mat().createNest(
             [[petsc_J11, petsc_J12],
              [petsc_J21, petsc_J22]])
         P_petsc = J_petsc
-        
+
     def iterate(self, sol):
         """
         Procedure overriding update of parent class(Problem)
-        
+
         Args:
         problem: Class with inputs  (rhs, q_exponent)
         sol  : Class with unkowns (tdens, pot in this case)
 
         Returns:
-         sol : update sol from time t^k to t^{k+1} 
+         sol : update sol from time t^k to t^{k+1}
 
         """
         method = self.get_ctrl("method")
         method_ctrl = self.get_ctrl(method)
-        
+
         if method == "explicit_euler_tdens":
             # check that residual is below threesold
             pot, tdens = self.subfunctions(sol)
             gradient_pot = self.Lagrangian_gradient(pot, tdens, 'pot')
-            res_pot = np.linalg.norm(gradient_pot) / np.linalg.norm(self.problem.rhs) 
+            res_pot = np.linalg.norm(gradient_pot) / np.linalg.norm(self.problem.rhs)
             if res_pot > self.get_ctrl("tol_constraint"):
                 petsc_options = (flatten_parameters({
                 # get main linear solver controls
-                **{'ksp' : nested_get(method_ctrl, ["ksp"])},  
-                **flatten_parameters({'pc' : nested_get(method_ctrl, ["pc"])}),    
+                **{'ksp' : nested_get(method_ctrl, ["ksp"])},
+                **flatten_parameters({'pc' : nested_get(method_ctrl, ["pc"])}),
                 **{
                     # we start from previous solution
                     'ksp_initial_guess_nonzero': True,
@@ -861,10 +861,10 @@ class AdmkSolverNetwork:
                 },
 
                 }))
-        
+
                 ierr = self.solve_pot(sol, petsc_options)
 
-                
+
             # compute update direction
             gradient_tdens = self.Lagrangian_gradient(pot, tdens, 'tdens')
             update = - tdens * gradient_tdens
@@ -878,17 +878,17 @@ class AdmkSolverNetwork:
                 self.deltat *= nested_get(method_ctrl,["deltat","expansion"])
             if deltat_ctrl == "adaptive":
                 self.deltat = adaptive_deltat(tdens, update)
-                
+
             self.deltat = max(self.deltat, nested_get(method_ctrl,["deltat","min"]))
             self.deltat = min(self.deltat, nested_get(method_ctrl,["deltat","max"]))
 
             msg=bounds(tdens,'TDENS')
             self.print_info(msg,2,1)
-            
+
             msg=bounds(update,'UPDATE') + f' deltat={self.deltat:.2e}'
             self.print_info(msg,2,1)
-            
-            
+
+
             # update tdens
             tdens += self.deltat * update
             tdens_min =  nested_get(method_ctrl,['tdens_min'])
@@ -898,8 +898,8 @@ class AdmkSolverNetwork:
             # set linear solvers
             petsc_options = (flatten_parameters({
                 # get main linear solver controls
-                **{'ksp' : nested_get(method_ctrl, ["ksp"])},  
-                **flatten_parameters({'pc' : nested_get(method_ctrl, ["pc"])}),    
+                **{'ksp' : nested_get(method_ctrl, ["ksp"])},
+                **flatten_parameters({'pc' : nested_get(method_ctrl, ["pc"])}),
                 **{
                     # we start from previous solution
                     'ksp_initial_guess_nonzero': True,
@@ -911,16 +911,16 @@ class AdmkSolverNetwork:
                 },
 
                 }))
-            ierr = self.solve_pot(sol, petsc_options)  
-            
+            ierr = self.solve_pot(sol, petsc_options)
+
             if ierr == 0:
                 self.time += self.deltat
-            
+
             return ierr
 
         elif (method == 'implicit_euler_gfvar'):
             self.deltat = 1.0
-            
+
             fnewton = np.zeros(self.n_pot + self.n_tdens)
 
             it = 0
@@ -928,7 +928,7 @@ class AdmkSolverNetwork:
             x = np.zeros(self.n_pot + self.n_tdens)
             ierr = 0
 
-            pot, tdens = self.subfunctions(sol)    
+            pot, tdens = self.subfunctions(sol)
             gfvar = self.tdens2gfvar(tdens)
 
             x[self.pot_indices] = pot[:]
@@ -947,15 +947,15 @@ class AdmkSolverNetwork:
                 'ksp_rtol': 1e-10,
                 "ksp_monitor_true_residual" : None,
                 #
-                "pc_type": "fieldsplit", 
+                "pc_type": "fieldsplit",
                 "pc_fieldsplit_type" : "schur", # based on schur complement
                 "pc_fieldsplit_schur_fact_type": "full", # use full factorization
                 # A B^T = (I         )(A  )(I A^{-1})
-                # B  -C   (BA^{-1} I )(  S)(  I     )        
+                # B  -C   (BA^{-1} I )(  S)(  I     )
                 # TODO : swap order of fields, now is not working and we need to swap
                 # when pc_setfieldsplit
                 "pc_fieldsplit_0_fields": "1,", # field 1
-                "pc_fieldsplit_1_fields": "0,", # field 0 
+                "pc_fieldsplit_1_fields": "0,", # field 0
                 "pc_fieldsplit_schur_precondition" : "selfp", # form Sp=A+B^T C^{-1} B                               }
                 "fieldsplit_0": {
                     "ksp_type": "preonly",
@@ -983,25 +983,25 @@ class AdmkSolverNetwork:
                     **flatten_parameters(snes_options)
                 }
                 print(petsc_options)
-                
+
                 problem_prefix = 'nonlinear_solver_'
-                
+
                 # Setup SNES solver
                 snes = PETSc.SNES().create()
 
-                opts = PETSc.Options()    
+                opts = PETSc.Options()
                 opts.prefixPush(problem_prefix)
                 for k, v in petsc_options.items():
                     opts[k] = v
                     opts.prefixPop()
-                    
+
                 pc = snes.ksp.getPC()
                 pc.setFromOptions()
                 pc.setFieldSplitIS(('0',self.pot_is),('1',self.tdens_is))
                 pc.setOptionsPrefix(problem_prefix)
                 pc.setFromOptions()
 
-                # this is allocation 
+                # this is allocation
                 J11, J12, J21, J22 = self.eval_Jacobian(x)
                 petsc_J11 = scipy2petsc(J11)
                 petsc_J12 = scipy2petsc(J12)
@@ -1021,7 +1021,7 @@ class AdmkSolverNetwork:
                 snes.setFunction(self.F_block,petsc_F)
                 snes.setJacobian(self.J_block,petsc_J,P=None)
 
-                
+
                 snes.setFromOptions()
                 snes.solve(None, petsc_x)
                 x[:] = petsc_x.getArray()
@@ -1034,9 +1034,9 @@ class AdmkSolverNetwork:
                 if ierr_newton == 0:
                     sol[self.pot_indices] = pot[:]
                     sol[self.tdens_indices] = self.gfvar2tdens(gfvar)[:]
-                    
+
                 return 0
-        
+
             it = 0
             max_iter = 20
             ierr_newton = 0
@@ -1067,7 +1067,7 @@ class AdmkSolverNetwork:
                 petsc_J = PETSc.Mat().createNest(
                     [[petsc_J11, petsc_J12],
                      [petsc_J21, petsc_J22]])
-                
+
                 petsc_inc = petsc_J.createVecLeft()
                 petsc_rhs = petsc_J.createVecRight()
 
@@ -1076,17 +1076,17 @@ class AdmkSolverNetwork:
                 print ("L_sizes",L_sizes)
                 neqns = L_sizes[0][0]
                 print ("neqns",neqns)
-                
+
                 problem_prefix = 'jacobian_solver_'
 
-                
 
-                
-                
-                
+
+
+
+
                 # copy from https://github.com/FEniCS/dolfinx/blob/230e027269c0b872c6649f053e734ed7f49b6962/python/dolfinx/fem/petsc.py#L618
                 # https://github.com/FEniCS/dolfinx/fem/petsc.py
-                opts = PETSc.Options()    
+                opts = PETSc.Options()
                 opts.prefixPush(problem_prefix)
                 for k, v in ksp_options.items():
                     opts[k] = v
@@ -1100,15 +1100,15 @@ class AdmkSolverNetwork:
                 # assign fieldsplit
                 pc = ksp.getPC()
                 pc.setFromOptions()
-                
+
                 pc.setFieldSplitIS(('0',self.tdens_is),('1',self.pot_is))
-                
+
                 #pc.setFieldSplitFields(self.n_tdens,('0','1'))
                 #pc.setFieldSplitFields(self.n_pot,('1','0'))
                 #pc.setFieldSplitIS(('0',self.pot_is),('1',self.tdens_is))
                 pc.setOptionsPrefix(problem_prefix)
                 pc.setFromOptions()
-                
+
                 ksp.setConvergenceHistory()
                 ksp.setUp()
                 ksp.setFromOptions()
@@ -1125,25 +1125,25 @@ class AdmkSolverNetwork:
                 # convert to petsc
                 petsc_rhs.setArray(fnewton)
                 petsc_inc.setArray(inc)
-                
+
                 # solve
                 ksp.solve(petsc_rhs, petsc_inc)
-                
+
                 reason = ksp.getConvergedReason()
                 last_pres = ksp.getResidualNorm()
                 if reason < 0:
                     ierr_newton = 1
                 rhs_norm = petsc_rhs.norm()
-               
+
                 last_iter = ksp.getIterationNumber()
                 h = ksp.getConvergenceHistory()
                 if len(h)>0:
                     resvec = h[-(last_iter+1):]
 
                     res = 0
-                    if rhs_norm > 0: 
+                    if rhs_norm > 0:
                         res=resvec[-1]/rhs_norm
-                        
+
                     last_pres = ksp.getResidualNorm()
                     pres = last_pres
 
@@ -1152,18 +1152,18 @@ class AdmkSolverNetwork:
                 inc[:] = petsc_inc.getArray()
 
                 #res = norm(J.dot(inc)-fnewton)
-                
-                
+
+
                 x += inc
 
                 pot, gfvar = self.subfunctions(x)
                 it += 1
-                
+
 
                 print(f'{it=} {ierr_newton=}| linear solver {res=:.1e} iter={last_iter}')
             print(ksp_options)
             ksp.view()
-                
+
             if ierr_newton == 0:
                 sol[self.pot_indices] = pot[:]
                 sol[self.tdens_indices] = self.gfvar2tdens(gfvar)[:]
@@ -1171,18 +1171,18 @@ class AdmkSolverNetwork:
                 ierr = ierr_newton
 
             return ierr
-            
-                
-        
-        
-        
-            
-            
-        # elif (ctrl.time_discretization_method == 'explicit_gfvar'):            
+
+
+
+
+
+
+
+        # elif (ctrl.time_discretization_method == 'explicit_gfvar'):
         #     # compute update
-        #     pot, tdens = self.subfunctions(sol) 
-        #     gfvar = self.tdens2gfvar(tdens) 
-        #     trans_prime = self.gfvar2tdens(gfvar, 1) # 1 means zero derivative so 
+        #     pot, tdens = self.subfunctions(sol)
+        #     gfvar = self.tdens2gfvar(tdens)
+        #     trans_prime = self.gfvar2tdens(gfvar, 1) # 1 means zero derivative so
         #     grad = problem.potential_gradient(pot)
 
 
@@ -1191,14 +1191,14 @@ class AdmkSolverNetwork:
 
         #     # update gfvar and tdens
         #     gfvar = gfvar - ctrl.deltat * update
-        #     tdens = self.gfvar2tdens(gfvar, 0) # 0 means zero derivative so 
+        #     tdens = self.gfvar2tdens(gfvar, 0) # 0 means zero derivative so
 
         #     # compute potential
-        #     self.time = self.time + ctrl.deltat    
+        #     self.time = self.time + ctrl.deltat
         #     problem.update_inputs(self.time)
         #     [sol,ierr,self] = self.syncronize(problem,sol)
 
-            
+
 
         #     return ierr
 
@@ -1206,13 +1206,13 @@ class AdmkSolverNetwork:
         #     #shorthand
         #     n_pot = problem.n_row
         #     n_tdens = problem.n_col
-            
+
         #     # pass in gfvar varaible
         #     pot, tdens = self.subfunctions(sol)
         #     gfvar_old = self.tdens2gfvar(tdens)
         #     gfvar = cp(gfvar_old)
         #     pot   = cp(pot)
-            
+
         #     f_newton = np.zeros(n_pot+n_tdens)
         #     increment = np.zeros(n_pot+n_tdens)
         #     inewton = 0
@@ -1228,7 +1228,7 @@ class AdmkSolverNetwork:
         #         trans_second = self.gfvar2tdens(gfvar, 2) # 2 means second derivative
         #         grad_pot = problem.potential_gradient(pot)
 
-    
+
         #         f_newton[0:n_pot] = (problem.matrix.dot(tdens*grad_pot) - problem.rhs)
         #         f_newton[n_pot:n_pot+n_tdens] = -problem.weight * (
         #             ( gfvar - gfvar_old ) / ctrl.deltat
@@ -1243,11 +1243,11 @@ class AdmkSolverNetwork:
         #              ' |F|_gfvar= '+'{:.2E}'.format(np.linalg.norm(f_newton[n_pot:n_pot+n_tdens])))
         #         if (ctrl.verbose >= 2 ):
         #             print(msg)
-                
+
         #         if ( self.nonlinear_solver_residuum < ctrl.tolerance_nonlinear ) :
         #             ierr_newton == 0
         #             break
-                
+
         #         # assembly jacobian
         #         conductivity = tdens*problem.inv_weight
         #         A_matrix = self.build_stiff(problem.matrix, conductivity)
@@ -1260,7 +1260,7 @@ class AdmkSolverNetwork:
         #             + trans_second * 0.5 * (-grad_pot**2 + 1.0)
         #         )
         #         C_matrix = sp.sparse.diags(diag_C_matrix)
-                
+
 
         #         if (ctrl.save_newton_matrices > 0):
         #             base = f'time{self.current_iter:05d}_newton{inewton:05d}'
@@ -1272,16 +1272,16 @@ class AdmkSolverNetwork:
         #             np.save(base+'_gfvar_rhs',f_newton[n_pot:npot+ntdens])
         #             np.save(base+'_pot',pot)
         #             np.save(base+'_gfvar',f_newton[0:n_pot])
-                    
-                            
-                
+
+
+
         #         inv_C_matrix = sp.sparse.diags(1.0/diag_C_matrix)
 
-                
+
         #         # form primal Schur complement S=A+BT * C^{-1} B
         #         primal_S_matrix = A_matrix+BT_matrix.dot(inv_C_matrix.dot(B_matrix))+1e-12*sp.sparse.eye(n_pot)
-                
-                
+
+
         #         # solve linear system
         #         # increment
         #         primal_rhs = ( f_newton[0:n_pot]
@@ -1290,8 +1290,8 @@ class AdmkSolverNetwork:
         #                                              use_umfpack=True)
         #         increment[n_pot:n_pot+n_tdens] = - inv_C_matrix.dot(
         #             f_newton[n_pot:n_pot+n_tdens] - B_matrix.dot(increment[0:n_pot]))
-                
-                
+
+
         #         # line search to ensure C being strictly positive
         #         finished = False
         #         newton_step = 1.0
@@ -1322,14 +1322,14 @@ class AdmkSolverNetwork:
         #         msg='Newton step='+str(newton_step)
         #         if (ctrl.verbose >= 3 ):
         #             print(msg)
-                
-                      
+
+
         #         # count iterations
         #         inewton += 1
         #         if (inewton == ctrl.max_nonlinear_iterations ):
         #             ierr_newton = 1
         #             # end of newton
-           
+
 
         #     # copy the value in sol (even if the are wrong)
         #     sol[:self.n_pot] = pot
@@ -1350,8 +1350,8 @@ class AdmkSolverNetwork:
 
             return ierr
 
-  
-            
+
+
     def solve(self,
               initial_solution = None,
               after_update_callback = None):
@@ -1363,13 +1363,13 @@ class AdmkSolverNetwork:
             ctrl: control object
         Returns:
             ierr: error code (0: success)
-        """ 
+        """
         # use stored solution
         sol = self.sol
         if initial_solution is not None:
             sol[:] = initial_solution[:]
-        
-            
+
+
         # solve first Laplacian
         petsc_options = flatten_parameters(
             {
@@ -1379,7 +1379,7 @@ class AdmkSolverNetwork:
             }
         )
         ierr = self.solve_pot(sol, petsc_options)
-        
+
         # Start main cycle
         iter = 0
         while (ierr == 0) and (iter < self.get_ctrl("max_iter")):
@@ -1388,9 +1388,9 @@ class AdmkSolverNetwork:
             nrestart = 0
             ierr_iterate = 0
             while ierr_iterate == 0 :
-                
+
                 ierr_iterate = self.iterate(sol)
-                if ierr_iterate == 0:    
+                if ierr_iterate == 0:
                     break
                 else:
                     sol = deepcopy(sol_old)
@@ -1399,26 +1399,26 @@ class AdmkSolverNetwork:
                         break
 
                     method = self.get_ctrl("method")
-                    if method == "explicit_euler": 
-                        self.deltat /= 2.0 
+                    if method == "explicit_euler":
+                        self.deltat /= 2.0
 
-            # check if the iteration has been successful    
+            # check if the iteration has been successful
             if ierr_iterate != 0:
                 ierr = 1
-                self.ierr_update = ierr_iterate 
-                
+                self.ierr_update = ierr_iterate
+
             print (f'{ierr=}',iter,self.ctrl.get('max_iter'))
-                
+
             # check if the maximum number of iterations has been reached
             iter += 1
             if iter == self.ctrl.get('max_iter'):
                 ierr = 2
-            
+
             # Here the user evalutes if convergence is achieved
             pot, tdens = self.subfunctions(self.sol)
             gradient_pot = self.Lagrangian_gradient(pot, tdens, 'pot')
             res = norm(gradient_pot) / norm(self.problem.rhs)
-            
+
             gradient_tdens = self.Lagrangian_gradient(pot, tdens, 'tdens')
             var =  (
                 norm (tdens * gradient_tdens * self.problem.weight) /
@@ -1430,13 +1430,13 @@ class AdmkSolverNetwork:
                  (res < self.get_ctrl("tol_constraint"))) :
                 ierr = 0
                 print('DONE')
-                break 
-            
-            
+                break
+
+
 
             if after_update_callback is not None:
                 after_update_callback(self, sol)
-            
+
         return ierr
 
     def ierr_reason(self,ierr):

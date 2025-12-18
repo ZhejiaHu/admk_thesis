@@ -463,6 +463,9 @@ class AdmkControls:
         """
         Procedure to set new controls after a succesfull update
         """
+        # print(f"deltat: {deltat}")
+        # print(f"State: {state}")
+        # print(f"update: {update}")
         deltat_ctrl = self.method_ctrl['deltat']
         if (deltat_ctrl['control'] == 'fixed'):
             deltat = deltat
@@ -512,7 +515,7 @@ class AdmkControls:
                 negative_indeces  = np.where(update < 0)[0]
                 step = np.min((state_lower_bound - state[negative_indeces]) / update[negative_indeces])
                 if (step < deltat_ctrl['min']):
-                    raise ValueError("delta from adaptive strategy={step:.1e} is smaller than {deltat_ctrl['min']=}")
+                    raise ValueError(f"delta from adaptive strategy={step:.1e} is smaller than {deltat_ctrl['min']=}")
             else:
                 step=deltat_ctrl['max']
             deltat = min(step,deltat_ctrl['max'])
@@ -577,7 +580,7 @@ class AdmkSolver:
     with A signed incidence matrix of Graph
     via Algebraic Dynamic Monge-Kantorovich.
     We find the long time solution of the
-    dynamics
+    dynamics.py
     \dt \Tdens(t)=\Tdens(t) * | \Grad \Pot(\Tdens)|^2 -Tdens^{gamma}
     """
     def __init__(self,problem, ctrl):

@@ -23,13 +23,11 @@ def create_forcing(n_nodes, num_commodity: int=2) -> List[np.ndarray]:
 
 
 def set_control(beta:float=1, log_print=True):
-    ctrl = AdmkControls(tol_optimization=1e-3, tol_constraint=1e-8, method='explicit_tdens', max_iter=200,
-                        max_restart=5, verbose=0, log=0, log_file='admk.log', beta=beta, log_print=log_print)
+    ctrl = AdmkControls(tol_optimization=1e-3, tol_constraint=1e-8, method='explicit_tdens', max_iter=20,
+                        max_restart=5, verbose=1, log=0, log_file='admk.log', beta=beta, log_print=log_print)
 
     # deltat controls
-    ctrl.set_method_ctrl('deltat',
-                         {'control': 'adaptive2', 'initial': 1e-2, 'min': 1e-2, 'max': 1e-1, 'expansion': 1.05,
-                          'contraction': 2.0})
+    ctrl.set_method_ctrl('deltat',{'control': 'adaptive2', 'initial': 1e-2, 'min': 1e-6, 'max': 1e-1, 'expansion': 1.05, 'contraction': 2.0})
     # linear solver
     # matrix is singualr. we need to relax it with + relax*identity
     ctrl.set_method_ctrl('relax_Laplacian', 1e-10)
@@ -52,10 +50,10 @@ def plot_result(graph_topo: np.ndarray, weights: np.ndarray, num_commodity: int,
     print(conductivity)
     print(f"Conductivity is {conductivity}")
     for i, potential in enumerate(potentials):
-        nx.draw_networkx_edges(graph, pos, width=[conductivity.get(edge, 1.0) * 3 for edge in list(graph.edges())], edge_color="C0", style="solid", ax=ax[i] if num_commodity > 1 else ax)
-        nx.draw_networkx_nodes(graph, pos=pos, node_shape='o', node_color='gray', node_size=np.abs(potential) * 500, linewidths=0.1, ax=ax[i] if num_commodity > 1 else ax)
-        nx.draw_networkx_labels(graph, pos=pos, labels={n: n for n in pos}, ax=ax[i] if num_commodity > 1 else ax)
-        nx.draw_networkx_edge_labels(graph, pos, edge_labels=edge_labels, ax=ax[i] if num_commodity > 1 else ax)
+        nx.draw_networkx_edges(graph, pos, width=[conductivity.get(edge, 1.0) * 0.3 for edge in list(graph.edges())], edge_color="C0", style="solid", ax=ax[i] if num_commodity > 1 else ax)
+        nx.draw_networkx_nodes(graph, pos=pos, node_shape='o', node_color='gray', node_size=np.abs(potential) * 50, linewidths=0.1, ax=ax[i] if num_commodity > 1 else ax)
+        # nx.draw_networkx_labels(graph, pos=pos, labels={n: n for n in pos}, ax=ax[i] if num_commodity > 1 else ax)
+        # nx.draw_networkx_edge_labels(graph, pos, edge_labels=edge_labels, ax=ax[i] if num_commodity > 1 else ax)
 
 
 
@@ -86,13 +84,13 @@ def test_main(topol: np.ndarray, weight: np.ndarray, num_commodity: int, forcing
         plt.title(f"Losses During Training with Beta {beta}")
 
     _plot(history_losses)
-    print('ierr=',ierr,admk.ierr_dictionary(ierr))
+    # print('ierr=',ierr,admk.ierr_dictionary(ierr))
     pot, tdens, vel = admk.solution.get_problem_solution()
 
     pots = [admk.solution.get_subpotential(i) for i in range(num_commodity)]
-    print(f"pots = {pots}")
-    print('tdens=',tdens)
-    print('vel=',vel)
+    # print(f"pots = {pots}")
+    # print('tdens=',tdens)
+    # print('vel=',vel)
 
     # check if convergence is achieved
     return pots, tdens
