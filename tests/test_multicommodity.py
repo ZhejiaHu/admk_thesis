@@ -23,6 +23,8 @@ def create_forcing(n_nodes, num_commodity: int=2) -> List[np.ndarray]:
 
 
 def set_control(beta:float=1, log_print=True, max_iter=200):
+    import inspect
+    print("init signature:", inspect.signature(AdmkControls.__init__))
     ctrl = AdmkControls(tol_optimization=1e-3, tol_constraint=1e-8, method='explicit_tdens', max_iter=max_iter,
                         max_restart=5, verbose=1, log=0, log_file='admk.log', beta=beta, log_print=log_print)
 
