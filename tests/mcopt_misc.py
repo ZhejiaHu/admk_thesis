@@ -21,8 +21,9 @@ def plot_network(graph, forcing, tdens_mcopt_, tdens_admk_):
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
     node_prop = 0.01
 
-
-    for idx, tdens in enumerate([tdens_mcopt, tdens_mcopt]):
+    print(f"tdens_admk_: {tdens_admk_}")
+    
+    for idx, tdens in enumerate([tdens_mcopt, tdens_admk]):
         nx.draw_networkx_edges(graph,
                                pos=pos,
                                width=tdens * 15,

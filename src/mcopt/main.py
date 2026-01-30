@@ -76,7 +76,7 @@ class McOpt:
 
     def export_setup(self) -> Tuple[np.ndarray, np.ndarray, List[np.ndarray]]:
         edge_lists = np.array([list(e) for e in self.g.edges()])
-        return edge_lists, np.array(self.length), [self.forcing[:, i] / 100000 for i in range(self.forcing.shape[1])]
+        return edge_lists, np.array(self.length), [self.forcing[:, i] for i in range(self.forcing.shape[1])]
 
 
     def dyn_exec(self):

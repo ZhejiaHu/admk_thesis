@@ -610,6 +610,7 @@ class AdmkSolver:
         """
         pot = sol.sol[:self.n_pot * self.problem.n_rhs]
         tdens = sol.sol[-self.n_tdens:]
+        #print(f"pot: {pot} || tdens: {tdens}")
         return pot, tdens
 
 
