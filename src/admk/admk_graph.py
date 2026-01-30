@@ -989,11 +989,12 @@ class AdmkSolver:
     def _evaluate_loss(self, tdens):
         incidence_transpose_, weight = np.transpose(self.problem.matrix), self.problem.weight
         laplacian_ = np.transpose(incidence_transpose_) @ np.diag(tdens / weight) @ incidence_transpose_
+        inv_laplacian_ = np.linalg.pinv(laplacian_)
         forcing = self.problem.rhs
         energy = 0
         for i in range(self.problem.n_rhs):
             cur_forcing = forcing[i * self.problem.n_row:(i+1) * self.problem.n_row]
-            potential = np.linalg.pinv(laplacian_) @ cur_forcing
+            potential = inv_laplacian_ @ cur_forcing
             energy += 0.5 * np.dot(cur_forcing, potential)
         assert np.isscalar(energy)
         return energy + 0.5 * np.dot(weight, tdens)

@@ -60,7 +60,7 @@ def plot_result(graph_topo: np.ndarray, weights: np.ndarray, num_commodity: int,
 
 
 def test_main(topol: np.ndarray, weight: np.ndarray, num_commodity: int, forcing_: List[np.ndarray], beta: float=1, max_iter: int=200) -> Tuple[List[np.ndarray], np.ndarray]:
-    assert len(forcing_) == num_commodity
+    assert len(forcing_[0]) == num_commodity
 
     # Init. graph problem, incidence matrix and its transpose
     graph = Graph(topol.transpose())
@@ -95,7 +95,7 @@ def test_main(topol: np.ndarray, weight: np.ndarray, num_commodity: int, forcing
     # print('vel=',vel)
 
     # check if convergence is achieved
-    return pots, tdens
+    return pots, tdens, pots
 
 
 if __name__ == "__main__":
