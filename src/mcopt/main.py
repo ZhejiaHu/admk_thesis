@@ -16,7 +16,7 @@ from scipy.sparse import diags
 from .initialization import *
 from .dynamics import *
 from .optimization import *
-from typing import Tuple, List
+from typing import Dict, Tuple, List
 
 
 path = os.getcwd()
@@ -27,7 +27,7 @@ class McOpt:
     """Multicommodity Optimal Transport"""
 
     def __init__(self, method, coupling, museed, pflux, verbose, rho, relax_linsys, tau_cond_dyn, tau_cost_dyn,
-                 time_step, tot_time, tau_cond_opt, tau_cost_opt):
+                 time_step, tot_time, tau_cond_opt, tau_cost_opt, waxman_config: Dict[str, float]=None):
 
         # graph topology
         self.g = nx.Graph()                                     # graph
@@ -61,6 +61,11 @@ class McOpt:
         self.optflux_opt = np.zeros((self.g.number_of_edges(), self.g.number_of_edges()))
         self.cost_stack_dyn = np.zeros(self.g.number_of_edges())
         self.cost_stack_opt = np.zeros(self.g.number_of_edges())
+        
+        # Waxman Configuration 
+        self.waxman_config = waxman_config
+
+
 
     def ot_setup(self):
         """Building graph topology"""
@@ -68,7 +73,10 @@ class McOpt:
         print("* graph topology construction")
 
         if self.method == "synth":
-            self.g, self.length, self.forcing = waxman_topology(self)
+            if self.waxman_config is not None:
+                self.g, self.length, self.forcing = waxman_topology(self, self.waxman_config["n"], self.waxman_config["alpha"], self.waxman_config["beta"], self.waxman_config["L"])
+            else:
+                self.g, self.length, self.forcing = waxman_topology(self)
         if self.method == "paris":
             self.g, self.length, self.forcing = paris_topology(self, input_path)
             print(f"Graph: {self.g}")

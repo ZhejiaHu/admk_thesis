@@ -87,14 +87,14 @@ def test_main(topol: np.ndarray, weight: np.ndarray, num_commodity: int, forcing
     _plot(history_losses)
     # print('ierr=',ierr,admk.ierr_dictionary(ierr))
     pot, tdens, vel = admk.solution.get_problem_solution()
-
+    final_energy = admk._evaluate_loss(tdens)
     pots = [admk.solution.get_subpotential(i) for i in range(num_commodity)]
     # print(f"pots = {pots}")
     # print('tdens=',tdens)
     # print('vel=',vel)
 
     # check if convergence is achieved
-    return pots, tdens, pots
+    return pots, tdens, final_energy
 
 
 if __name__ == "__main__":

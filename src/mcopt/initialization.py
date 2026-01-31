@@ -14,7 +14,7 @@ import pickle as pkl
 from scipy.spatial import distance
 
 
-def waxman_topology(self):
+def waxman_topology(self, n=30, alpha=1, beta=0.25, L=1.0):
     """Generation of the Waxman graph topology
 
     Parameters:
@@ -26,7 +26,7 @@ def waxman_topology(self):
     """
 
     # graph topology construction
-    self.g = nx.waxman_graph(n=30, alpha=1, beta=0.25, L=1.0, domain=(0, 0, 1, 1), seed=0)
+    self.g = nx.waxman_graph(n=n, alpha=alpha, beta=beta, L=L, domain=(0, 0, 1, 1), seed=0)
 
     self.length = np.zeros(self.g.number_of_edges())
     for i, edge in enumerate(self.g.edges()):
