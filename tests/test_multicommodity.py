@@ -68,7 +68,6 @@ def test_main(topol: np.ndarray, weight: np.ndarray, num_commodity: int, forcing
     incidence_matrix_transpose = incidence_matrix.transpose()
     forcing = np.concatenate(forcing_)
 
-
     problem = MinNorm(incidence_matrix_transpose, rhs_of_time=forcing, q_exponent=1.0, weight=weight)
     admk = AdmkSolver(problem, set_control(beta=beta, log_print=False, max_iter=max_iter))
     admk.ctrl.set_method_ctrl(['pc','type'],'hypre')
