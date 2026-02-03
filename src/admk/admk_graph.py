@@ -97,7 +97,7 @@ class MinNorm:
             self.q_exponent_of_time = lambda t: q_exponent
         # We set the exponent at the initial time
         self.q_exponent = self.q_exponent_of_time(initial_time)
-
+        print(f"MinNorm Setup: n_row: {self.n_row}, n_col: {self.n_col}, self.n_rhs: {self.n_rhs}")
         ierr = self.check_inputs()
         if (ierr != 0):
             print('Error in inputs at time t=',initial_time)
