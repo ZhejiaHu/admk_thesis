@@ -22,11 +22,11 @@ def create_forcing(n_nodes, num_commodity: int=2) -> List[np.ndarray]:
     else: return [forcing_1, forcing_2]
 
 
-def set_control(beta:float=1, log_print=True, max_iter=200):
+def set_control(beta:float=1, log_print=True, max_iter=1000):
     import inspect
     print("init signature:", inspect.signature(AdmkControls.__init__))
-    ctrl = AdmkControls(tol_optimization=1e-3, tol_constraint=1e-8, method='explicit_tdens', max_iter=max_iter,
-                        max_restart=5, verbose=1, log=0, log_file='admk.log', beta=beta, log_print=log_print)
+    ctrl = AdmkControls(tol_optimization=1e-4, tol_constraint=1e-8, method='explicit_tdens', max_iter=max_iter,
+                        max_restart=20, verbose=1, log=0, log_file='admk.log', beta=beta, log_print=log_print)
 
     # deltat controls
     ctrl.set_method_ctrl('deltat',{'control': 'adaptive2', 'initial': 1e-2, 'min': 1e-6, 'max': 1e-1, 'expansion': 1.05, 'contraction': 2.0})
