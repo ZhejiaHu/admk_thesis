@@ -25,14 +25,14 @@ def create_forcing(n_nodes, num_commodity: int=2) -> List[np.ndarray]:
 def set_control(beta:float=1, log_print=True, max_iter=1000):
     import inspect
     print("init signature:", inspect.signature(AdmkControls.__init__))
-    ctrl = AdmkControls(tol_optimization=1e-4, tol_constraint=1e-8, method='explicit_tdens', max_iter=max_iter,
-                        max_restart=20, verbose=1, log=0, log_file='admk.log', beta=beta, log_print=log_print)
+    ctrl = AdmkControls(tol_optimization=1e-5, tol_constraint=1e-6, method='explicit_tdens', max_iter=max_iter,
+                        max_restart=10, verbose=1, log=0, log_file='admk.log', beta=beta, log_print=log_print)
 
     # deltat controls
-    ctrl.set_method_ctrl('deltat',{'control': 'adaptive2', 'initial': 1e-2, 'min': 1e-6, 'max': 1e-1, 'expansion': 1.05, 'contraction': 2.0})
+    ctrl.set_method_ctrl('deltat',{'control': 'adaptive2', 'initial': 1e-1, 'min': 1e-10, 'max': 1, 'expansion': 1.1, 'contraction': 1.8})
     # linear solver
     # matrix is singualr. we need to relax it with + relax*identity
-    ctrl.set_method_ctrl('relax_Laplacian', 1e-10)
+    ctrl.set_method_ctrl('relax_Laplacian', 1e-6)
     ctrl.set_method_ctrl(['ksp', 'type'], 'cg')
     ctrl.set_method_ctrl(['pc', 'type'], 'icc')
     ctrl.set_method_ctrl(['pc', 'factor_drop_tolerance', 'dt'], 1e-4)
