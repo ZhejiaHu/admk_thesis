@@ -50,7 +50,7 @@ def dyn(self):
     # initialization quantities of dynamics
     nnode = self.g.number_of_nodes()
     # incidence matrix
-    inc_mat = csr_matrix(nx.incidence_matrix(self.g, nodelist=list(range(nnode)), oriented=True))
+    inc_mat = csr_matrix(nx.incidence_matrix(self.g, nodelist=list(range(nnode)) if not self.is_grid else None, oriented=True))
     inc_transpose = csr_matrix(inc_mat.transpose())
     inv_len_mat = diags(1/self.length, 0)
     td_mat = diags(self.tdens, 0)
@@ -59,6 +59,7 @@ def dyn(self):
 
     # spsolve
     stiff_relax = stiff + self.relax_linsys * identity(nnode)  # avoid zero kernel
+    print(f"stiff_relax shape: {stiff_relax.shape} | self.forcing: {self.forcing.shape}")
     pot = spsolve(stiff_relax, self.forcing)                   # pressure vector
 
     # executing dynamics

@@ -64,6 +64,7 @@ class McOpt:
         
         # Waxman Configuration 
         self.waxman_config = waxman_config
+        self.is_grid = False
 
 
 
@@ -81,6 +82,19 @@ class McOpt:
             self.g, self.length, self.forcing = paris_topology(self, input_path)
             print(f"Graph: {self.g}")
             print(f"Forcing: {self.forcing}")
+
+
+    def ot_reset(self, graph: nx.Graph, length, forcing):
+        self.g, self.length, self.forcing = graph, length, forcing
+
+        self.tdens = np.zeros(self.g.number_of_edges())
+        self.opttends_dyn = np.zeros(self.g.number_of_edges())
+        self.optpot_dyn = np.zeros((self.g.number_of_edges(), self.g.number_of_edges()))
+        self.optflux_opt = np.zeros((self.g.number_of_edges(), self.g.number_of_edges()))
+        self.cost_stack_dyn = np.zeros(self.g.number_of_edges())
+        self.cost_stack_opt = np.zeros(self.g.number_of_edges())
+        self.is_grid = True
+
 
     def export_setup(self) -> Tuple[np.ndarray, np.ndarray, List[np.ndarray]]:
         edge_lists = np.array([list(e) for e in self.g.edges()])
