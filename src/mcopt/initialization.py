@@ -119,6 +119,8 @@ def forcing_generation(self, forcing_path):
 
         self.forcing = rhs_construction(self, ncomm, comm_list, g_forcing)
 
+        print(f"Sum over axis=0: {np.sum(self.forcing, axis=0)} | axis=1: {np.sum(self.forcing, axis=1)}")
+
         return self.forcing
 
 

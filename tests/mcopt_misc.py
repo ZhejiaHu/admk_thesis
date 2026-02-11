@@ -1,6 +1,6 @@
 import numpy as np
 
-def plot_network(graph, forcing, tdens_mcopt_, tdens_admk_):
+def plot_network(graph, forcing, tdens_mcopt_, tdens_admk_, mask):
     import matplotlib.pyplot as plt
     import networkx as nx
     import numpy as np
@@ -15,13 +15,14 @@ def plot_network(graph, forcing, tdens_mcopt_, tdens_admk_):
     tdens_mcopt, tdens_admk = tdens_mcopt_ / np.linalg.norm(tdens_mcopt_), tdens_admk_ / np.linalg.norm(tdens_admk_)
     inflows = np.diag(forcing)
     inflows = inflows / np.sum(inflows)
+    print(f"Inflows: {inflows}")
 
     pos = {n[0]: n[1]["pos"] for n in graph.nodes(data=True)}
 
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-    node_prop = 0.01
 
     print(f"tdens_admk_: {tdens_admk_}")
+    node_prop = 100
     
     for idx, tdens in enumerate([tdens_mcopt, tdens_admk]):
         nx.draw_networkx_edges(graph,
@@ -34,8 +35,8 @@ def plot_network(graph, forcing, tdens_mcopt_, tdens_admk_):
                                nodelist=comm_list,
                                pos=pos,
                                node_shape='o',
-                               node_color='gray',
-                               node_size=inflows * node_prop,
+                               node_color='orange',
+                               node_size=inflows * mask * node_prop,
                                linewidths=0.1,
                                ax=ax[idx])
 

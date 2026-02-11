@@ -95,6 +95,12 @@ class McOpt:
         self.cost_stack_opt = np.zeros(self.g.number_of_edges())
         self.is_grid = True
 
+    def ot_forcing_mask(self, mask: np.ndarray):
+        num_comm = len(self.forcing)
+        for comm in range(num_comm):
+            if mask[comm] == 0:
+                self.forcing[comm, :] = 0
+
 
     def export_setup(self) -> Tuple[np.ndarray, np.ndarray, List[np.ndarray]]:
         edge_lists = np.array([list(e) for e in self.g.edges()])
