@@ -15,13 +15,13 @@ def plot_network(graph, forcing, tdens_mcopt_, tdens_admk_, mask):
     tdens_mcopt, tdens_admk = tdens_mcopt_ / np.linalg.norm(tdens_mcopt_), tdens_admk_ / np.linalg.norm(tdens_admk_)
     inflows = np.diag(forcing)
     inflows = inflows / np.sum(inflows)
-    print(f"Inflows: {inflows}")
+    #print(f"Inflows: {inflows}")
 
     pos = {n[0]: n[1]["pos"] for n in graph.nodes(data=True)}
 
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
 
-    print(f"tdens_admk_: {tdens_admk_}")
+    #print(f"tdens_admk_: {tdens_admk_}")
     node_prop = 100
     
     for idx, tdens in enumerate([tdens_mcopt, tdens_admk]):

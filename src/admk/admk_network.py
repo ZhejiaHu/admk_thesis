@@ -1384,7 +1384,7 @@ class AdmkSolverNetwork:
         iter = 0
         while (ierr == 0) and (iter < self.get_ctrl("max_iter")):
             # try to update the solution
-            sol_old = deepcopy(sol)
+            sol_old = sol.copy()
             nrestart = 0
             ierr_iterate = 0
             while ierr_iterate == 0 :
@@ -1393,7 +1393,7 @@ class AdmkSolverNetwork:
                 if ierr_iterate == 0:
                     break
                 else:
-                    sol = deepcopy(sol_old)
+                    sol = sol_old.copy()
                     nrestart += 1
                     if nrestart == self.get_ctrl("max_restart"):
                         break

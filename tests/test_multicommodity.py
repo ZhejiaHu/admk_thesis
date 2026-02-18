@@ -24,7 +24,7 @@ def create_forcing(n_nodes, num_commodity: int=2) -> List[np.ndarray]:
 
 def set_control(beta:float=1, log_print=True, max_iter=1000):
     import inspect
-    print("init signature:", inspect.signature(AdmkControls.__init__))
+    #print("init signature:", inspect.signature(AdmkControls.__init__))
     ctrl = AdmkControls(tol_optimization=1e-4, tol_constraint=1e-5, method='explicit_tdens', max_iter=max_iter,
                         max_restart=10, verbose=2, log=0, log_file='admk.log', beta=beta, log_print=log_print)
 
@@ -44,13 +44,13 @@ def plot_result(graph_topo: np.ndarray, weights: np.ndarray, num_commodity: int,
     assert len(potentials) == num_commodity and len(conductivity) == graph_topo.shape[0] and graph_topo.shape[0] == weights.shape[0]
     graph = nx.Graph()
     graph.add_edges_from(map(lambda i: (graph_topo[i][0], graph_topo[i][1], {"weight": weights[i], "conductivity": conductivity[i]}), range(len(graph_topo))))
-    print(graph.edges)
-    print(graph.nodes)
+    #print(graph.edges)
+    #print(graph.nodes)
     fig, ax = plt.subplots(num_commodity, 1, figsize=(8, 8))
     pos = nx.spring_layout(graph)
     edge_labels, conductivity = nx.get_edge_attributes(graph, "weight"), nx.get_edge_attributes(graph, "conductivity")
-    print(conductivity)
-    print(f"Conductivity is {conductivity}")
+    #print(conductivity)
+    #print(f"Conductivity is {conductivity}")
     for i, potential in enumerate(potentials):
         nx.draw_networkx_edges(graph, pos, width=[conductivity.get(edge, 1.0) * 0.3 for edge in list(graph.edges())], edge_color="C0", style="solid", ax=ax[i] if num_commodity > 1 else ax)
         nx.draw_networkx_nodes(graph, pos=pos, node_shape='o', node_color='gray', node_size=np.abs(potential) * 50, linewidths=0.1, ax=ax[i] if num_commodity > 1 else ax)

@@ -10,20 +10,21 @@ from scipy.spatial import distance
 def get_graph_union(g1: nx.Graph, g2: nx.Graph, weight: str = 'length'):
 
     G_union = nx.Graph()
+    numv_1 = len(g1.nodes())
 
     for node in g1.nodes():
         G_union.add_node(node)
         G_union.nodes[node]["pos"] = g1.nodes[node]["pos"]
 
     for node in g2.nodes():
-        G_union.add_node(node)
-        G_union.nodes[node]["pos"] = g2.nodes[node]["pos"]
+        G_union.add_node(node + numv_1)
+        G_union.nodes[node + numv_1]["pos"] = g2.nodes[node]["pos"]
 
     for edge in g1.edges():
         G_union.add_edge(edge[0], edge[1])
 
     for edge in g2.edges():
-        G_union.add_edge(edge[0], edge[1])
+        G_union.add_edge(edge[0] + numv_1, edge[1] + numv_1)
 
     if weight == "unit":
         for edge in sorted(G_union.edges):

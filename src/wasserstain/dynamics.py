@@ -112,6 +112,7 @@ def dmk_solve(self):
         it = 0
         # only needed if spsolve has problems (inside update)
         prng = np.random.RandomState(seed=self.seed)
+        print(f"self.B shape: {self.B} | self.tdens shape: {self.tdens}")
         stiff = (
             self.B
             * diags(self.tdens, 0)
@@ -140,7 +141,7 @@ def dmk_solve(self):
 
             # equations update
             self.tdens, pot, info = update(self, pot, relax_linsys)
-
+            print(f"self.tdens: {self.tdens}")
             # singular Laplacian matrix
             if info != 0:
                 self.tdens = (
