@@ -19,9 +19,9 @@ from .linear_solvers import info_ksp
 from .linear_solvers import get_info
 from .linear_solvers import KSPReasons
 from petsc4py import PETSc
-import multiprocessing
+import multiprocessing as mp
 
-from multiprocessing import RawArray, Array
+from multiprocessing import RawArray, Array, shared_memory
 
 class MinNorm:
     """
@@ -260,70 +260,103 @@ class Graph:
 #
 # following code is taken from firedrake
 #
+# def flatten_parameters(parameters, sep="_"):
+#     """Flatten a nested parameters dict, joining keys with sep.
+
+#     :arg parameters: a dict to flatten.
+#     :arg sep: separator of keys.
+
+#     Used to flatten parameter dictionaries with nested structure to a
+#     flat dict suitable to pass to PETSc.  For example:
+
+#     .. code-block:: python3
+
+#        flatten_parameters({"a": {"b": {"c": 4}, "d": 2}, "e": 1}, sep="_")
+#        => {"a_b_c": 4, "a_d": 2, "e": 1}
+
+#     If a "prefix" key already ends with the provided separator, then
+#     it is not used to concatenate the keys.  Hence:
+
+#     .. code-block:: python3
+
+#        flatten_parameters({"a_": {"b": {"c": 4}, "d": 2}, "e": 1}, sep="_")
+#        => {"a_b_c": 4, "a_d": 2, "e": 1}
+#        # rather than
+#        => {"a__b_c": 4, "a__d": 2, "e": 1}
+#     """
+#     new = type(parameters)()
+
+#     if not len(parameters):
+#         return new
+
+#     def flatten(parameters, *prefixes):
+#         """Iterate over nested dicts, yielding (*keys, value) pairs."""
+#         sentinel = object()
+#         try:
+#             option = sentinel
+#             for option, value in parameters.items():
+#                 # Recurse into values to flatten any dicts.
+#                 for pair in flatten(value, option, *prefixes):
+#                     yield pair
+#             # Make sure zero-length dicts come back.
+#             if option is sentinel:
+#                 yield (prefixes, parameters)
+#         except AttributeError:
+#             # Non dict values are just returned.
+#             yield (prefixes, parameters)
+
+#     def munge(keys):
+#         """Ensure that each intermediate key in keys ends in sep.
+
+#         Also, reverse the list."""
+#         for key in reversed(keys[1:]):
+#             if len(key) and not key.endswith(sep):
+#                 yield key + sep
+#             else:
+#                 yield key
+#         else:
+#             yield keys[0]
+
+#     for keys, value in flatten(parameters):
+#         option = "".join(map(str, munge(keys)))
+#         if option in new:
+#             print("Ignoring duplicate option: %s (existing value %s, new value %s)",
+#                     option, new[option], value)
+#         new[option] = value
+#     return new
+
+
+
 def flatten_parameters(parameters, sep="_"):
-    """Flatten a nested parameters dict, joining keys with sep.
+    """Faster iterative flatten: returns a plain dict."""
+    out = {}
+    try:
+        if not len(parameters):
+            return type(parameters)()
+    except Exception:
+        pass
 
-    :arg parameters: a dict to flatten.
-    :arg sep: separator of keys.
-
-    Used to flatten parameter dictionaries with nested structure to a
-    flat dict suitable to pass to PETSc.  For example:
-
-    .. code-block:: python3
-
-       flatten_parameters({"a": {"b": {"c": 4}, "d": 2}, "e": 1}, sep="_")
-       => {"a_b_c": 4, "a_d": 2, "e": 1}
-
-    If a "prefix" key already ends with the provided separator, then
-    it is not used to concatenate the keys.  Hence:
-
-    .. code-block:: python3
-
-       flatten_parameters({"a_": {"b": {"c": 4}, "d": 2}, "e": 1}, sep="_")
-       => {"a_b_c": 4, "a_d": 2, "e": 1}
-       # rather than
-       => {"a__b_c": 4, "a__d": 2, "e": 1}
-    """
-    new = type(parameters)()
-
-    if not len(parameters):
-        return new
-
-    def flatten(parameters, *prefixes):
-        """Iterate over nested dicts, yielding (*keys, value) pairs."""
-        sentinel = object()
-        try:
-            option = sentinel
-            for option, value in parameters.items():
-                # Recurse into values to flatten any dicts.
-                for pair in flatten(value, option, *prefixes):
-                    yield pair
-            # Make sure zero-length dicts come back.
-            if option is sentinel:
-                yield (prefixes, parameters)
-        except AttributeError:
-            # Non dict values are just returned.
-            yield (prefixes, parameters)
-
-    def munge(keys):
-        """Ensure that each intermediate key in keys ends in sep.
-
-        Also, reverse the list."""
-        for key in reversed(keys[1:]):
-            if len(key) and not key.endswith(sep):
-                yield key + sep
+    stack = [("", parameters)]
+    while stack:
+        prefix, cur = stack.pop()
+        if hasattr(cur, "items") and callable(getattr(cur, "items")):
+            items = list(cur.items())
+            if not items:
+                out[prefix] = cur
             else:
-                yield key
+                # push children in reversed order to preserve visit order
+                for k, v in reversed(items):
+                    k_str = str(k)
+                    if prefix == "":
+                        new_prefix = k_str
+                    else:
+                        new_prefix = prefix + k_str if prefix.endswith(sep) else prefix + sep + k_str
+                    stack.append((new_prefix, v))
         else:
-            yield keys[0]
+            out[prefix] = cur
+    return out
 
-    for keys, value in flatten(parameters):
-        option = "".join(map(str, munge(keys)))
-        if option in new:
-            print("Ignoring duplicate option: %s (existing value %s, new value %s)",
-                    option, new[option], value)
-        new[option] = value
-    return new
+
 
 
 def nested_set(dic, keys, value, create_missing=True):
@@ -677,7 +710,7 @@ class AdmkSolver:
         }))
 
 
-        np = max(min(multiprocessing.cpu_count(), int(self.problem.n_rhs / 4 ) ),1)
+        np = max(min(mp.cpu_count(), int(self.problem.n_rhs / 4 ) ),1)
 
         ierr, iter, res, pres = solve_with_petsc_parallel(stiff, rhs, pot, petsc_options, np)
         #ierr, iter, res, pres = solve_with_petsc(stiff, problem.rhs, tdpot[:self.n_pot * self.problem.n_rhs], petsc_options)
@@ -1213,28 +1246,28 @@ def solve_portion(stiff, petsc_options, start, end):
     #print(np_potprese])
 
     return ierr, iter, res, pres
-
+import math 
 
 def solve_with_petsc_parallel(stiff, rhs, pot, petsc_options, NUM_WORKERS=None):
     if NUM_WORKERS is None:
-        NUM_WORKERS = multiprocessing.cpu_count()
+        NUM_WORKERS = mp.cpu_count()
     n_pot = stiff.shape[0]
     n_rhs = len(rhs)// n_pot
-    NUM_WORKERS = min(min(NUM_WORKERS, multiprocessing.cpu_count()),n_rhs)
+    NUM_WORKERS = mp.cpu_count() // 2
 
-    chunk_size = int(n_rhs / NUM_WORKERS) + 1
+    chunk_size = math.ceil(n_rhs / NUM_WORKERS)
 
 
-    rhs_mp = multiprocessing.Array('d', n_pot * n_rhs, lock=True)
+    rhs_mp = mp.Array('d', n_pot * n_rhs, lock=True)
     rhs_np = np.frombuffer(rhs_mp.get_obj())
     np.copyto(rhs_np,rhs)
 
-    pot_mp = multiprocessing.Array('d', n_pot * n_rhs, lock=True)
+    pot_mp = mp.Array('d', n_pot * n_rhs, lock=True)
     pot_np = np.frombuffer(pot_mp.get_obj())
     np.copyto(pot_np,pot)
 
     # create shared memory with rhs and pot
-    pool = multiprocessing.Pool(processes=NUM_WORKERS, initializer=initpool, initargs=(rhs_mp,pot_mp))
+    pool = mp.Pool(processes=NUM_WORKERS, initializer=initpool, initargs=(rhs_mp,pot_mp))
 
     result = []
     indeces = np.arange(n_rhs)
@@ -1256,3 +1289,6 @@ def solve_with_petsc_parallel(stiff, rhs, pot, petsc_options, NUM_WORKERS=None):
     pot[:] = np.frombuffer(pot_mp.get_obj())
 
     return ierr, iter, res, pres
+
+
+

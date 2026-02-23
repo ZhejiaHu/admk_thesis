@@ -4,6 +4,7 @@ import sys
 import os
 
 import networkx as nx
+import time
 
 # Import Admk solver for graphs
 sys.path.append('../src/')
@@ -26,13 +27,13 @@ def set_control(beta:float=1, log_print=True, max_iter=1000):
     import inspect
     #print("init signature:", inspect.signature(AdmkControls.__init__))
     ctrl = AdmkControls(tol_optimization=1e-4, tol_constraint=1e-5, method='explicit_tdens', max_iter=max_iter,
-                        max_restart=10, verbose=2, log=0, log_file='admk.log', beta=beta, log_print=log_print)
+                        max_restart=2, verbose=2, log=0, log_file='admk.log', beta=beta, log_print=log_print)
 
     # deltat controls
-    ctrl.set_method_ctrl('deltat',{'control': 'adaptive2', 'initial': 1e-1, 'min': 1e-21, 'max': 1, 'expansion': 1.2, 'contraction': 1.8})
+    ctrl.set_method_ctrl('deltat', {'control': 'adaptive2', 'initial': 1e-3, 'min': 1e-10, 'max': 1e-1, 'expansion': 1.2, 'contraction': 2})
     # linear solver
     # matrix is singualr. we need to relax it with + relax*identity
-    ctrl.set_method_ctrl('relax_Laplacian', 1e-6)
+    ctrl.set_method_ctrl('relax_Laplacian', 1e-10)
     ctrl.set_method_ctrl(['ksp', 'type'], 'cg')
     ctrl.set_method_ctrl(['pc', 'type'], 'icc')
     ctrl.set_method_ctrl(['pc', 'factor_drop_tolerance', 'dt'], 1e-4)
@@ -66,7 +67,7 @@ def test_main(topol: np.ndarray, weight: np.ndarray, num_commodity: int, forcing
     incidence_matrix = graph.signed_incidence_matrix()
     incidence_matrix_transpose = incidence_matrix.transpose()
     forcing = np.concatenate(forcing_)
-
+    
     problem = MinNorm(incidence_matrix_transpose, rhs_of_time=forcing, q_exponent=1.0, weight=weight)
     admk = AdmkSolver(problem, set_control(beta=beta, log_print=False, max_iter=max_iter))
     admk.ctrl.set_method_ctrl(['pc','type'],'hypre')
@@ -75,8 +76,10 @@ def test_main(topol: np.ndarray, weight: np.ndarray, num_commodity: int, forcing
     pot0, tdens0 = sol0.subfunctions()
     tdens0[:]=2.0
     admk.set_initial_guess(sol0)
-
+    start = time.process_time()
     ierr, history_losses = admk.solve()
+    running_time_admk = time.process_time() - start
+    print(f"Elapsed (wall clock): {running_time_admk:.6f} s")
     def _plot(history_losses: List[float]):
         plt.plot(history_losses)
         plt.xlabel("Iteration")
@@ -93,7 +96,7 @@ def test_main(topol: np.ndarray, weight: np.ndarray, num_commodity: int, forcing
     # print('vel=',vel)
 
     # check if convergence is achieved
-    return pots, tdens, final_energy
+    return pots, tdens, final_energy, running_time_admk
 
 
 if __name__ == "__main__":

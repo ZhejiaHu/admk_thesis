@@ -97,7 +97,7 @@ class MinNormProblem:
         # We set the rhs at the initial time
         # to get the number of rhs and fix the rhs
         # if fix in time
-        self.rhs = deepcopy(rhs)
+        self.rhs = rhs.copy()
         self.q_exponent = q_exponent
 
         ierr = self.check_inputs()
@@ -135,70 +135,103 @@ class MinNormProblem:
 #
 # following code is taken from firedrake
 #
+# def flatten_parameters(parameters, sep="_"):
+#     """Flatten a nested parameters dict, joining keys with sep.
+
+#     :arg parameters: a dict to flatten.
+#     :arg sep: separator of keys.
+
+#     Used to flatten parameter dictionaries with nested structure to a
+#     flat dict suitable to pass to PETSc.  For example:
+
+#     .. code-block:: python3
+
+#        flatten_parameters({"a": {"b": {"c": 4}, "d": 2}, "e": 1}, sep="_")
+#        => {"a_b_c": 4, "a_d": 2, "e": 1}
+
+#     If a "prefix" key already ends with the provided separator, then
+#     it is not used to concatenate the keys.  Hence:
+
+#     .. code-block:: python3
+
+#        flatten_parameters({"a_": {"b": {"c": 4}, "d": 2}, "e": 1}, sep="_")
+#        => {"a_b_c": 4, "a_d": 2, "e": 1}
+#        # rather than
+#        => {"a__b_c": 4, "a__d": 2, "e": 1}
+#     """
+#     new = type(parameters)()
+
+#     if not len(parameters):
+#         return new
+
+#     def flatten(parameters, *prefixes):
+#         """Iterate over nested dicts, yielding (*keys, value) pairs."""
+#         sentinel = object()
+#         try:
+#             option = sentinel
+#             for option, value in parameters.items():
+#                 # Recurse into values to flatten any dicts.
+#                 for pair in flatten(value, option, *prefixes):
+#                     yield pair
+#             # Make sure zero-length dicts come back.
+#             if option is sentinel:
+#                 yield (prefixes, parameters)
+#         except AttributeError:
+#             # Non dict values are just returned.
+#             yield (prefixes, parameters)
+
+#     def munge(keys):
+#         """Ensure that each intermediate key in keys ends in sep.
+
+#         Also, reverse the list."""
+#         for key in reversed(keys[1:]):
+#             if len(key) and not key.endswith(sep):
+#                 yield key + sep
+#             else:
+#                 yield key
+#         else:
+#             yield keys[0]
+
+#     for keys, value in flatten(parameters):
+#         option = "".join(map(str, munge(keys)))
+#         if option in new:
+#             print("Ignoring duplicate option: %s (existing value %s, new value %s)",
+#                     option, new[option], value)
+#         new[option] = value
+#     return new
+
+
+
 def flatten_parameters(parameters, sep="_"):
-    """Flatten a nested parameters dict, joining keys with sep.
+    """Faster iterative flatten: returns a plain dict."""
+    out = {}
+    try:
+        if not len(parameters):
+            return type(parameters)()
+    except Exception:
+        pass
 
-    :arg parameters: a dict to flatten.
-    :arg sep: separator of keys.
-
-    Used to flatten parameter dictionaries with nested structure to a
-    flat dict suitable to pass to PETSc.  For example:
-
-    .. code-block:: python3
-
-       flatten_parameters({"a": {"b": {"c": 4}, "d": 2}, "e": 1}, sep="_")
-       => {"a_b_c": 4, "a_d": 2, "e": 1}
-
-    If a "prefix" key already ends with the provided separator, then
-    it is not used to concatenate the keys.  Hence:
-
-    .. code-block:: python3
-
-       flatten_parameters({"a_": {"b": {"c": 4}, "d": 2}, "e": 1}, sep="_")
-       => {"a_b_c": 4, "a_d": 2, "e": 1}
-       # rather than
-       => {"a__b_c": 4, "a__d": 2, "e": 1}
-    """
-    new = type(parameters)()
-
-    if not len(parameters):
-        return new
-
-    def flatten(parameters, *prefixes):
-        """Iterate over nested dicts, yielding (*keys, value) pairs."""
-        sentinel = object()
-        try:
-            option = sentinel
-            for option, value in parameters.items():
-                # Recurse into values to flatten any dicts.
-                for pair in flatten(value, option, *prefixes):
-                    yield pair
-            # Make sure zero-length dicts come back.
-            if option is sentinel:
-                yield (prefixes, parameters)
-        except AttributeError:
-            # Non dict values are just returned.
-            yield (prefixes, parameters)
-
-    def munge(keys):
-        """Ensure that each intermediate key in keys ends in sep.
-
-        Also, reverse the list."""
-        for key in reversed(keys[1:]):
-            if len(key) and not key.endswith(sep):
-                yield key + sep
+    stack = [("", parameters)]
+    while stack:
+        prefix, cur = stack.pop()
+        if hasattr(cur, "items") and callable(getattr(cur, "items")):
+            items = list(cur.items())
+            if not items:
+                out[prefix] = cur
             else:
-                yield key
+                # push children in reversed order to preserve visit order
+                for k, v in reversed(items):
+                    k_str = str(k)
+                    if prefix == "":
+                        new_prefix = k_str
+                    else:
+                        new_prefix = prefix + k_str if prefix.endswith(sep) else prefix + sep + k_str
+                    stack.append((new_prefix, v))
         else:
-            yield keys[0]
+            out[prefix] = cur
+    return out
 
-    for keys, value in flatten(parameters):
-        option = "".join(map(str, munge(keys)))
-        if option in new:
-            print("Ignoring duplicate option: %s (existing value %s, new value %s)",
-                    option, new[option], value)
-        new[option] = value
-    return new
+
 
 
 def nested_set(dic, keys, value, create_missing=True):
@@ -219,12 +252,8 @@ def bounds(vect,label:str):
 
 def nested_get(dic, keys):
     d = dic
-    for key in keys[:-1]:
-        if key in d:
-            d = d[key]
-
-    value = d[keys[-1]]
-    return value
+    for key in keys: d = d[key] 
+    return d
 
 
 def nested_set(dic, keys, value, create_missing=True):
@@ -351,6 +380,8 @@ def solve_with_petsc(stiff,
 
         if (res > petsc_options['ksp_rtol']):
             print(f'{KSPReasons[reason]=} {i_rhs=} {res=} rhs={petsc_rhs.norm()} pot={petsc_pot.norm()}')
+            ierr = 1
+            return ierr
 
     # get solution
     pot[:] = petsc_pot.getArray()
@@ -431,7 +462,7 @@ class AdmkSolverNetwork:
             'tol_opt': tol_opt,
             'tol_constraint': tol_constraint,
             'max_iter': max_iter,
-            'max_restart': 5,
+            'max_restart': 2,
             'method': 'explicit_euler_tdens',
             # monitor controls
             "verbose": 0,
@@ -597,7 +628,7 @@ class AdmkSolverNetwork:
         #
         # solve linear system
         #
-        relax = self.get_ctrl("relax_Laplacian")
+        relax = self.ctrl["relax_Laplacian"]
         stiff += relax * sp.sparse.eye(self.n_pot) # matrix is singular
 
         ierr, iters, res, pres = solve_with_petsc(stiff, rhs, pot, petsc_options )
@@ -837,26 +868,26 @@ class AdmkSolverNetwork:
          sol : update sol from time t^k to t^{k+1}
 
         """
-        method = self.get_ctrl("method")
-        method_ctrl = self.get_ctrl(method)
+        method = self.ctrl["method"]
+        method_ctrl = self.ctrl[method]
 
         if method == "explicit_euler_tdens":
             # check that residual is below threesold
             pot, tdens = self.subfunctions(sol)
             gradient_pot = self.Lagrangian_gradient(pot, tdens, 'pot')
             res_pot = np.linalg.norm(gradient_pot) / np.linalg.norm(self.problem.rhs)
-            if res_pot > self.get_ctrl("tol_constraint"):
+            if res_pot > self.ctrl["tol_constraint"]:
                 petsc_options = (flatten_parameters({
                 # get main linear solver controls
-                **{'ksp' : nested_get(method_ctrl, ["ksp"])},
-                **flatten_parameters({'pc' : nested_get(method_ctrl, ["pc"])}),
+                **{'ksp' : method_ctrl["ksp"]},
+                **flatten_parameters({'pc' : method_ctrl["pc"]}),
                 **{
                     # we start from previous solution
                     'ksp_initial_guess_nonzero': True,
                     # we solve the linear system to reach the tolerance
                     # of the constraint since
                     # div(v)-f = div(tdens grad pot) -f
-                    'ksp_rtol': self.get_ctrl('tol_constraint'),
+                    'ksp_rtol': self.ctrl['tol_constraint'],
                     #'ksp_monitor_true_residualot': None,
                 },
 
@@ -870,7 +901,8 @@ class AdmkSolverNetwork:
             update = - tdens * gradient_tdens
 
             # set time step deltat
-            deltat_ctrl = nested_get(method_ctrl,["deltat","control"])
+            #deltat_ctrl = nested_get(method_ctrl,["deltat","control"])
+            deltat_ctrl = method_ctrl["deltat"]["control"]
 
             if deltat_ctrl == "fixed":
                 pass
@@ -879,8 +911,11 @@ class AdmkSolverNetwork:
             if deltat_ctrl == "adaptive":
                 self.deltat = adaptive_deltat(tdens, update)
 
-            self.deltat = max(self.deltat, nested_get(method_ctrl,["deltat","min"]))
-            self.deltat = min(self.deltat, nested_get(method_ctrl,["deltat","max"]))
+
+            self.deltat = max(self.deltat, method_ctrl["deltat"]["min"])
+            self.deltat = min(self.deltat, method_ctrl["deltat"]["max"])
+            # self.deltat = max(self.deltat, nested_get(method_ctrl,["deltat","min"]))
+            # self.deltat = min(self.deltat, nested_get(method_ctrl,["deltat","max"]))
 
             msg=bounds(tdens,'TDENS')
             self.print_info(msg,2,1)
@@ -891,22 +926,22 @@ class AdmkSolverNetwork:
 
             # update tdens
             tdens += self.deltat * update
-            tdens_min =  nested_get(method_ctrl,['tdens_min'])
-            tdens[np.where(tdens < tdens_min)] = tdens_min
+            tdens_min =  method_ctrl['tdens_min']
+            np.maximum(tdens, tdens_min, out=tdens)   
             # no need to set sol since tdens is just a pointer
 
             # set linear solvers
             petsc_options = (flatten_parameters({
                 # get main linear solver controls
-                **{'ksp' : nested_get(method_ctrl, ["ksp"])},
-                **flatten_parameters({'pc' : nested_get(method_ctrl, ["pc"])}),
+                **{'ksp' : method_ctrl["ksp"]},
+                **flatten_parameters({'pc' : method_ctrl["pc"]}),
                 **{
                     # we start from previous solution
                     'ksp_initial_guess_nonzero': True,
                     # we solve the linear system to reach the tolerance
                     # of the constraint since
                     # div(v)-f = div(tdens grad pot) -f
-                    'ksp_rtol': self.get_ctrl('tol_constraint'),
+                    'ksp_rtol': self.ctrl['tol_constraint'],
                     #'ksp_monitor_true_residualot': None,
                 },
 
@@ -918,259 +953,259 @@ class AdmkSolverNetwork:
 
             return ierr
 
-        elif (method == 'implicit_euler_gfvar'):
-            self.deltat = 1.0
+        # elif (method == 'implicit_euler_gfvar'):
+        #     self.deltat = 1.0
 
-            fnewton = np.zeros(self.n_pot + self.n_tdens)
+        #     fnewton = np.zeros(self.n_pot + self.n_tdens)
 
-            it = 0
-            inc = np.zeros(self.n_pot + self.n_tdens)
-            x = np.zeros(self.n_pot + self.n_tdens)
-            ierr = 0
+        #     it = 0
+        #     inc = np.zeros(self.n_pot + self.n_tdens)
+        #     x = np.zeros(self.n_pot + self.n_tdens)
+        #     ierr = 0
 
-            pot, tdens = self.subfunctions(sol)
-            gfvar = self.tdens2gfvar(tdens)
+        #     pot, tdens = self.subfunctions(sol)
+        #     gfvar = self.tdens2gfvar(tdens)
 
-            x[self.pot_indices] = pot[:]
-            x[self.tdens_indices] = gfvar[:]
+        #     x[self.pot_indices] = pot[:]
+        #     x[self.tdens_indices] = gfvar[:]
 
-            self.gfvar_old = np.zeros(self.n_tdens)
-            self.gfvar_old[:] = gfvar[:]
+        #     self.gfvar_old = np.zeros(self.n_tdens)
+        #     self.gfvar_old[:] = gfvar[:]
 
-            #self.pc.setType('fieldsplit')
-            ksp_options={
-                'ksp_type': 'preonly',
-                'pc_type': 'lu'
-            }
-            ksp_options={
-                'ksp_type': 'fgmres',
-                'ksp_rtol': 1e-10,
-                "ksp_monitor_true_residual" : None,
-                #
-                "pc_type": "fieldsplit",
-                "pc_fieldsplit_type" : "schur", # based on schur complement
-                "pc_fieldsplit_schur_fact_type": "full", # use full factorization
-                # A B^T = (I         )(A  )(I A^{-1})
-                # B  -C   (BA^{-1} I )(  S)(  I     )
-                # TODO : swap order of fields, now is not working and we need to swap
-                # when pc_setfieldsplit
-                "pc_fieldsplit_0_fields": "1,", # field 1
-                "pc_fieldsplit_1_fields": "0,", # field 0
-                "pc_fieldsplit_schur_precondition" : "selfp", # form Sp=A+B^T C^{-1} B                               }
-                "fieldsplit_0": {
-                    "ksp_type": "preonly",
-                    "pc_type": "jacobi",
-                },
-                "fieldsplit_1": {
-                    "ksp_type": "preonly",
-                    "pc_type": "hypre",
-                },
-                "info": None
-                }
-            ksp_options = flatten_parameters(ksp_options)
+        #     #self.pc.setType('fieldsplit')
+        #     ksp_options={
+        #         'ksp_type': 'preonly',
+        #         'pc_type': 'lu'
+        #     }
+        #     ksp_options={
+        #         'ksp_type': 'fgmres',
+        #         'ksp_rtol': 1e-10,
+        #         "ksp_monitor_true_residual" : None,
+        #         #
+        #         "pc_type": "fieldsplit",
+        #         "pc_fieldsplit_type" : "schur", # based on schur complement
+        #         "pc_fieldsplit_schur_fact_type": "full", # use full factorization
+        #         # A B^T = (I         )(A  )(I A^{-1})
+        #         # B  -C   (BA^{-1} I )(  S)(  I     )
+        #         # TODO : swap order of fields, now is not working and we need to swap
+        #         # when pc_setfieldsplit
+        #         "pc_fieldsplit_0_fields": "1,", # field 1
+        #         "pc_fieldsplit_1_fields": "0,", # field 0
+        #         "pc_fieldsplit_schur_precondition" : "selfp", # form Sp=A+B^T C^{-1} B                               }
+        #         "fieldsplit_0": {
+        #             "ksp_type": "preonly",
+        #             "pc_type": "jacobi",
+        #         },
+        #         "fieldsplit_1": {
+        #             "ksp_type": "preonly",
+        #             "pc_type": "hypre",
+        #         },
+        #         "info": None
+        #         }
+        #     ksp_options = flatten_parameters(ksp_options)
 
-            use_snes = False
-            if use_snes:
-                snes_options = {
-                    "snes" : {
-                        "type" : "nls",
-                        "rtol" : 1e-6,
-                        "monitor": None}
-                }
+        #     use_snes = False
+        #     if use_snes:
+        #         snes_options = {
+        #             "snes" : {
+        #                 "type" : "nls",
+        #                 "rtol" : 1e-6,
+        #                 "monitor": None}
+        #         }
 
-                petsc_options = {
-                    **flatten_parameters(ksp_options),
-                    **flatten_parameters(snes_options)
-                }
-                print(petsc_options)
+        #         petsc_options = {
+        #             **flatten_parameters(ksp_options),
+        #             **flatten_parameters(snes_options)
+        #         }
+        #         print(petsc_options)
 
-                problem_prefix = 'nonlinear_solver_'
+        #         problem_prefix = 'nonlinear_solver_'
 
-                # Setup SNES solver
-                snes = PETSc.SNES().create()
+        #         # Setup SNES solver
+        #         snes = PETSc.SNES().create()
 
-                opts = PETSc.Options()
-                opts.prefixPush(problem_prefix)
-                for k, v in petsc_options.items():
-                    opts[k] = v
-                    opts.prefixPop()
+        #         opts = PETSc.Options()
+        #         opts.prefixPush(problem_prefix)
+        #         for k, v in petsc_options.items():
+        #             opts[k] = v
+        #             opts.prefixPop()
 
-                pc = snes.ksp.getPC()
-                pc.setFromOptions()
-                pc.setFieldSplitIS(('0',self.pot_is),('1',self.tdens_is))
-                pc.setOptionsPrefix(problem_prefix)
-                pc.setFromOptions()
+        #         pc = snes.ksp.getPC()
+        #         pc.setFromOptions()
+        #         pc.setFieldSplitIS(('0',self.pot_is),('1',self.tdens_is))
+        #         pc.setOptionsPrefix(problem_prefix)
+        #         pc.setFromOptions()
 
-                # this is allocation
-                J11, J12, J21, J22 = self.eval_Jacobian(x)
-                petsc_J11 = scipy2petsc(J11)
-                petsc_J12 = scipy2petsc(J12)
-                petsc_J21 = scipy2petsc(J21)
-                petsc_J22 = scipy2petsc(J22)
+        #         # this is allocation
+        #         J11, J12, J21, J22 = self.eval_Jacobian(x)
+        #         petsc_J11 = scipy2petsc(J11)
+        #         petsc_J12 = scipy2petsc(J12)
+        #         petsc_J21 = scipy2petsc(J21)
+        #         petsc_J22 = scipy2petsc(J22)
 
-                petsc_J = PETSc.Mat().createNest(
-                    [[petsc_J11, petsc_J12],
-                    [petsc_J21, petsc_J22]])
+        #         petsc_J = PETSc.Mat().createNest(
+        #             [[petsc_J11, petsc_J12],
+        #             [petsc_J21, petsc_J22]])
 
-                petsc_F = petsc_J.createVecLeft()
-                petsc_x = petsc_J.createVecRight()
-                petsc_x.setArray(x)
-
-
-                # assign funcition, Jacobian, and Jacobian for preconditioner
-                snes.setFunction(self.F_block,petsc_F)
-                snes.setJacobian(self.J_block,petsc_J,P=None)
+        #         petsc_F = petsc_J.createVecLeft()
+        #         petsc_x = petsc_J.createVecRight()
+        #         petsc_x.setArray(x)
 
 
-                snes.setFromOptions()
-                snes.solve(None, petsc_x)
-                x[:] = petsc_x.getArray()
-                pot, gfvar = self.subfunctions(x)
-                snes_converged = snes.getConvergedReason()
-                print(snes_converged)
-                self.eval_F(potgfvar,fnewton)
-                fnorm = norm(fnewton)
-                print(f'|F|{fnorm:.1e}')
-                if ierr_newton == 0:
-                    sol[self.pot_indices] = pot[:]
-                    sol[self.tdens_indices] = self.gfvar2tdens(gfvar)[:]
-
-                return 0
-
-            it = 0
-            max_iter = 20
-            ierr_newton = 0
-            self.deltat = 1.0
-            while (it<=max_iter):
-                self.eval_F(x,fnewton)
-                fnewton *= -1.0
-                fnorm = norm(fnewton)
-                print(f'{it=:03d} |F|{fnorm:.1e}')
-                if fnorm < 1e-6 :
-                    break
-
-                if it>=max_iter:
-                    ierr_newton = 2
-                    break
+        #         # assign funcition, Jacobian, and Jacobian for preconditioner
+        #         snes.setFunction(self.F_block,petsc_F)
+        #         snes.setJacobian(self.J_block,petsc_J,P=None)
 
 
-                J11, J12, J21, J22 = self.eval_Jacobian(x)
-                #J = bmat([[J11,J12],[J21,J22]],format='csr')
-                #J = self.eval_Jacobian(x)
+        #         snes.setFromOptions()
+        #         snes.solve(None, petsc_x)
+        #         x[:] = petsc_x.getArray()
+        #         pot, gfvar = self.subfunctions(x)
+        #         snes_converged = snes.getConvergedReason()
+        #         print(snes_converged)
+        #         self.eval_F(potgfvar,fnewton)
+        #         fnorm = norm(fnewton)
+        #         print(f'|F|{fnorm:.1e}')
+        #         if ierr_newton == 0:
+        #             sol[self.pot_indices] = pot[:]
+        #             sol[self.tdens_indices] = self.gfvar2tdens(gfvar)[:]
 
-                #petsc_J = scipy2petsc(J)
-                petsc_J11 = scipy2petsc(J11)
-                petsc_J12 = scipy2petsc(J12)
-                petsc_J21 = scipy2petsc(J21)
-                petsc_J22 = scipy2petsc(J22)
+        #         return 0
 
-                petsc_J = PETSc.Mat().createNest(
-                    [[petsc_J11, petsc_J12],
-                     [petsc_J21, petsc_J22]])
+        #     it = 0
+        #     max_iter = 20
+        #     ierr_newton = 0
+        #     self.deltat = 1.0
+        #     while (it<=max_iter):
+        #         self.eval_F(x,fnewton)
+        #         fnewton *= -1.0
+        #         fnorm = norm(fnewton)
+        #         print(f'{it=:03d} |F|{fnorm:.1e}')
+        #         if fnorm < 1e-6 :
+        #             break
 
-                petsc_inc = petsc_J.createVecLeft()
-                petsc_rhs = petsc_J.createVecRight()
-
-                L_sizes = petsc_J.getSizes()
-                L_range = petsc_J.getOwnershipRange()
-                print ("L_sizes",L_sizes)
-                neqns = L_sizes[0][0]
-                print ("neqns",neqns)
-
-                problem_prefix = 'jacobian_solver_'
+        #         if it>=max_iter:
+        #             ierr_newton = 2
+        #             break
 
 
+        #         J11, J12, J21, J22 = self.eval_Jacobian(x)
+        #         #J = bmat([[J11,J12],[J21,J22]],format='csr')
+        #         #J = self.eval_Jacobian(x)
+
+        #         #petsc_J = scipy2petsc(J)
+        #         petsc_J11 = scipy2petsc(J11)
+        #         petsc_J12 = scipy2petsc(J12)
+        #         petsc_J21 = scipy2petsc(J21)
+        #         petsc_J22 = scipy2petsc(J22)
+
+        #         petsc_J = PETSc.Mat().createNest(
+        #             [[petsc_J11, petsc_J12],
+        #              [petsc_J21, petsc_J22]])
+
+        #         petsc_inc = petsc_J.createVecLeft()
+        #         petsc_rhs = petsc_J.createVecRight()
+
+        #         L_sizes = petsc_J.getSizes()
+        #         L_range = petsc_J.getOwnershipRange()
+        #         print ("L_sizes",L_sizes)
+        #         neqns = L_sizes[0][0]
+        #         print ("neqns",neqns)
+
+        #         problem_prefix = 'jacobian_solver_'
 
 
 
 
-                # copy from https://github.com/FEniCS/dolfinx/blob/230e027269c0b872c6649f053e734ed7f49b6962/python/dolfinx/fem/petsc.py#L618
-                # https://github.com/FEniCS/dolfinx/fem/petsc.py
-                opts = PETSc.Options()
-                opts.prefixPush(problem_prefix)
-                for k, v in ksp_options.items():
-                    opts[k] = v
-                    print(k,v)
-                opts.prefixPop()
-                opts.view()
-
-                ksp = PETSc.KSP().create()
-                ksp.setOperators(petsc_J)
-                ksp.setOptionsPrefix(problem_prefix)
-                # assign fieldsplit
-                pc = ksp.getPC()
-                pc.setFromOptions()
-
-                pc.setFieldSplitIS(('0',self.tdens_is),('1',self.pot_is))
-
-                #pc.setFieldSplitFields(self.n_tdens,('0','1'))
-                #pc.setFieldSplitFields(self.n_pot,('1','0'))
-                #pc.setFieldSplitIS(('0',self.pot_is),('1',self.tdens_is))
-                pc.setOptionsPrefix(problem_prefix)
-                pc.setFromOptions()
-
-                ksp.setConvergenceHistory()
-                ksp.setUp()
-                ksp.setFromOptions()
-                pc.view()
-                petsc_J.setOptionsPrefix(problem_prefix)
-                petsc_J.setFromOptions()
-
-                petsc_inc.setOptionsPrefix(problem_prefix)
-                petsc_inc.setFromOptions()
-
-                petsc_rhs.setOptionsPrefix(problem_prefix)
-                petsc_rhs.setFromOptions()
-
-                # convert to petsc
-                petsc_rhs.setArray(fnewton)
-                petsc_inc.setArray(inc)
-
-                # solve
-                ksp.solve(petsc_rhs, petsc_inc)
-
-                reason = ksp.getConvergedReason()
-                last_pres = ksp.getResidualNorm()
-                if reason < 0:
-                    ierr_newton = 1
-                rhs_norm = petsc_rhs.norm()
-
-                last_iter = ksp.getIterationNumber()
-                h = ksp.getConvergenceHistory()
-                if len(h)>0:
-                    resvec = h[-(last_iter+1):]
-
-                    res = 0
-                    if rhs_norm > 0:
-                        res=resvec[-1]/rhs_norm
-
-                    last_pres = ksp.getResidualNorm()
-                    pres = last_pres
 
 
-                # convert back to np
-                inc[:] = petsc_inc.getArray()
+        #         # copy from https://github.com/FEniCS/dolfinx/blob/230e027269c0b872c6649f053e734ed7f49b6962/python/dolfinx/fem/petsc.py#L618
+        #         # https://github.com/FEniCS/dolfinx/fem/petsc.py
+        #         opts = PETSc.Options()
+        #         opts.prefixPush(problem_prefix)
+        #         for k, v in ksp_options.items():
+        #             opts[k] = v
+        #             print(k,v)
+        #         opts.prefixPop()
+        #         opts.view()
 
-                #res = norm(J.dot(inc)-fnewton)
+        #         ksp = PETSc.KSP().create()
+        #         ksp.setOperators(petsc_J)
+        #         ksp.setOptionsPrefix(problem_prefix)
+        #         # assign fieldsplit
+        #         pc = ksp.getPC()
+        #         pc.setFromOptions()
+
+        #         pc.setFieldSplitIS(('0',self.tdens_is),('1',self.pot_is))
+
+        #         #pc.setFieldSplitFields(self.n_tdens,('0','1'))
+        #         #pc.setFieldSplitFields(self.n_pot,('1','0'))
+        #         #pc.setFieldSplitIS(('0',self.pot_is),('1',self.tdens_is))
+        #         pc.setOptionsPrefix(problem_prefix)
+        #         pc.setFromOptions()
+
+        #         ksp.setConvergenceHistory()
+        #         ksp.setUp()
+        #         ksp.setFromOptions()
+        #         pc.view()
+        #         petsc_J.setOptionsPrefix(problem_prefix)
+        #         petsc_J.setFromOptions()
+
+        #         petsc_inc.setOptionsPrefix(problem_prefix)
+        #         petsc_inc.setFromOptions()
+
+        #         petsc_rhs.setOptionsPrefix(problem_prefix)
+        #         petsc_rhs.setFromOptions()
+
+        #         # convert to petsc
+        #         petsc_rhs.setArray(fnewton)
+        #         petsc_inc.setArray(inc)
+
+        #         # solve
+        #         ksp.solve(petsc_rhs, petsc_inc)
+
+        #         reason = ksp.getConvergedReason()
+        #         last_pres = ksp.getResidualNorm()
+        #         if reason < 0:
+        #             ierr_newton = 1
+        #         rhs_norm = petsc_rhs.norm()
+
+        #         last_iter = ksp.getIterationNumber()
+        #         h = ksp.getConvergenceHistory()
+        #         if len(h)>0:
+        #             resvec = h[-(last_iter+1):]
+
+        #             res = 0
+        #             if rhs_norm > 0:
+        #                 res=resvec[-1]/rhs_norm
+
+        #             last_pres = ksp.getResidualNorm()
+        #             pres = last_pres
 
 
-                x += inc
+        #         # convert back to np
+        #         inc[:] = petsc_inc.getArray()
 
-                pot, gfvar = self.subfunctions(x)
-                it += 1
+        #         #res = norm(J.dot(inc)-fnewton)
 
 
-                print(f'{it=} {ierr_newton=}| linear solver {res=:.1e} iter={last_iter}')
-            print(ksp_options)
-            ksp.view()
+        #         x += inc
 
-            if ierr_newton == 0:
-                sol[self.pot_indices] = pot[:]
-                sol[self.tdens_indices] = self.gfvar2tdens(gfvar)[:]
-            else:
-                ierr = ierr_newton
+        #         pot, gfvar = self.subfunctions(x)
+        #         it += 1
 
-            return ierr
+
+        #         print(f'{it=} {ierr_newton=}| linear solver {res=:.1e} iter={last_iter}')
+        #     print(ksp_options)
+        #     ksp.view()
+
+        #     if ierr_newton == 0:
+        #         sol[self.pot_indices] = pot[:]
+        #         sol[self.tdens_indices] = self.gfvar2tdens(gfvar)[:]
+        #     else:
+        #         ierr = ierr_newton
+
+        #     return ierr
 
 
 
